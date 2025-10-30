@@ -28,7 +28,8 @@ def clean_salary_data(df):
 
         # Clean up years of experience
         df['Years of Experience'] = df['Years of Experience'].astype(str)
-        df['Years of Experience'] = df['Years of Experience'].str.extract('(\d+)', expand=False)
+        # Use a raw string for the regex to avoid invalid escape sequence warnings
+        df['Years of Experience'] = df['Years of Experience'].str.extract(r'(\d+)', expand=False)
         df['Years of Experience'] = pd.to_numeric(df['Years of Experience'], errors='coerce')
 
         # Remove unnecessary columns
