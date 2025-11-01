@@ -34,9 +34,9 @@ def submission_form(save_callback):
         if rate:
             st.info(f"Current USD to ZMW rate: {rate:.2f}")
 
-    # Load location options for dropdowns (cached in data handler if desired)
-    _locations = get_locations()
-    _location_options = ["Select location"] + _locations
+    # Load options for dropdowns (note: locations are now text inputs due to large dataset)
+    # _locations = get_locations()  # Commented out - 45k+ items cause performance issues
+    # _location_options = ["Select location"] + _locations
     _nationalities = get_nationalities()
     _nationality_options = ["Select nationality"] + _nationalities
     _industries = get_industries()
@@ -48,11 +48,10 @@ def submission_form(save_callback):
 
         with col1:
             role = st.text_input("Role*", key="role_mobile")
-            company_location = st.selectbox(
-                "Company Location*",
-                options=_location_options,
-                index=0,
+            company_location = st.text_input(
+                "Company Location* (e.g., Lusaka, Zambia)",
                 key="location_mobile",
+                help="Enter city and country"
             )
             
             # Salary inputs with currency conversion
@@ -105,11 +104,10 @@ def submission_form(save_callback):
                 value=1,
                 key="employees_mobile"
             )
-            your_location = st.selectbox(
-                "Your Location*",
-                options=_location_options,
-                index=0,
+            your_location = st.text_input(
+                "Your Location* (e.g., Zambia)",
                 key="your_location_mobile",
+                help="Enter your country or city"
             )
             nationality = st.selectbox(
                 "Nationality*",
@@ -140,26 +138,16 @@ def submission_form(save_callback):
         submitted = st.form_submit_button("Submit")
 
         if submitted:
-            # Treat the sentinel choice as empty so validation works as before
-            if company_location == "Select location":
-                company_location = ""
-            if your_location == "Select location":
-                your_location = ""
-            # You can do conversion logic here after submission
-            if company_location == "Select location":
-                company_location = ""
-            if your_location == "Select location":
-                your_location = ""
-            if nationality == "Select nationality":
-                nationality = ""
-            if company_location == "Select location":
-                company_location = ""
-            if your_location == "Select location":
-                your_location = ""
+            # Validation: treat "Select..." sentinel values as empty for dropdowns
             if nationality == "Select nationality":
                 nationality = ""
             if industry == "Select industry":
                 industry = ""
+            
+            # For text inputs, just strip whitespace
+            company_location = company_location.strip() if company_location else ""
+            your_location = your_location.strip() if your_location else ""
+            
             missing_fields = []
             if not role:
                 missing_fields.append("Role")
@@ -167,7 +155,7 @@ def submission_form(save_callback):
                 missing_fields.append("Company Location")
             if not salary_zmw:
                 missing_fields.append("Monthly Salary (ZMW)")
-            if not experience:
+            if experience is None or experience < 0:
                 missing_fields.append("Years of Experience")
             if not your_location:
                 missing_fields.append("Your Location")

@@ -1,18 +1,8 @@
 import os
 import sys
 
-# If this script is invoked directly with `python main.py` (bare mode),
-# Streamlit's runtime isn't available and importing `streamlit` will
-# emit repeated "missing ScriptRunContext" warnings. Detect that case
-# early and print a helpful message before any Streamlit import.
-if __name__ == "__main__":
-    # Common Streamlit environment keys that are present when run via
-    # `streamlit run`. If none are found, assume bare python execution.
-    streamlit_keys = ("STREAMLIT_RUN_MAIN", "STREAMLIT_SERVER_PORT", "STREAMLIT_BROWSER_GZIP")
-    if not any(k in os.environ for k in streamlit_keys):
-        print("This is a Streamlit app. To run it in a browser, use:")
-        print("    streamlit run c:/Users/justthatuser/Documents/GitHub/salarytransparency/main.py")
-        sys.exit(0)
+# Note: Removed problematic early exit check that was preventing the app from loading
+# The app works fine when run with `streamlit run main.py`
 
 import streamlit as st
 import pandas as pd
@@ -24,7 +14,6 @@ from utils.visualizations import (
 )
 from components.forms import submission_form
 from components.filters import country_filter
-import os
 
 st.set_page_config(
     page_title="Salary Transparency Platform",
@@ -34,38 +23,27 @@ st.set_page_config(
 )
 
 def main():
-    # Detect whether the app is being run via `streamlit run` (script run context).
-    # When running the script directly with `python main.py`, Streamlit's
-    # ScriptRunContext is not available and features like session state
-    # will emit repeated warnings. In that case, print an instruction and exit
-    # early to avoid noisy logs.
-    try:
-        # Import locally to avoid import-time side effects when not available
-        from streamlit.runtime.scriptrunner import get_script_run_ctx
-        ctx = get_script_run_ctx()
-    except Exception as e:
-        # If we can't get context, still try to run the app
-        # This allows the app to work even if context detection fails
-        ctx = None
-        st.warning(f"Note: Script context detection failed: {e}. App may have limited functionality.")
-    # PWA Setup
-    st.markdown("""
-        <link rel="manifest" href="./static/manifest.json">
-        <meta name="theme-color" content="#0066cc">
-        <meta name="apple-mobile-web-app-capable" content="yes">
-        <meta name="apple-mobile-web-app-status-bar-style" content="black">
-        <meta name="apple-mobile-web-app-title" content="SalaryApp">
-        <link rel="apple-touch-icon" href="./static/icons/icon-192.png">
-        <script>
-            if ('serviceWorker' in navigator) {
-                window.addEventListener('load', () => {
-                    navigator.serviceWorker.register('./static/sw.js', {scope: './'}).catch(err => {
-                        console.warn('Service worker registration failed:', err);
-                    });
-                });
-            }
-        </script>
-    """, unsafe_allow_html=True)
+    # Note: Context detection removed as it was causing initialization issues
+    # The app will work fine without explicit context checking
+    # PWA Setup - Commented out as static file paths conflict with Streamlit's own /static/ directory
+    # TODO: Re-implement PWA support using Streamlit's proper static file serving method
+    # st.markdown("""
+    #     <link rel="manifest" href="./static/manifest.json">
+    #     <meta name="theme-color" content="#0066cc">
+    #     <meta name="apple-mobile-web-app-capable" content="yes">
+    #     <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    #     <meta name="apple-mobile-web-app-title" content="SalaryApp">
+    #     <link rel="apple-touch-icon" href="./static/icons/icon-192.png">
+    #     <script>
+    #         if ('serviceWorker' in navigator) {
+    #             window.addEventListener('load', () => {
+    #                 navigator.serviceWorker.register('./static/sw.js', {scope: './'}).catch(err => {
+    #                     console.warn('Service worker registration failed:', err);
+    #                 });
+    #             });
+    #         }
+    #     </script>
+    # """, unsafe_allow_html=True)
 
     # Mobile-first styles
     st.markdown("""
