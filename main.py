@@ -11,7 +11,7 @@ if __name__ == "__main__":
     streamlit_keys = ("STREAMLIT_RUN_MAIN", "STREAMLIT_SERVER_PORT", "STREAMLIT_BROWSER_GZIP")
     if not any(k in os.environ for k in streamlit_keys):
         print("This is a Streamlit app. To run it in a browser, use:")
-        print("    streamlit run c:/Users/justthatuser/Documents/GitHub/salarytransparency/main.py")
+        print(f"    streamlit run {os.path.abspath(__file__)}")
         sys.exit(0)
 
 import streamlit as st
@@ -54,7 +54,7 @@ def main():
     if ctx is None:
         # Running in bare mode / direct python execution
         print("This is a Streamlit app. To run it in a browser, use:")
-        print("    streamlit run c:/Users/justthatuser/Documents/GitHub/salarytransparency/main.py")
+        print(f"    streamlit run {os.path.abspath(__file__)}")
         print("Session state and other Streamlit runtime features are unavailable when running with `python`.")
         return
     # PWA Setup
