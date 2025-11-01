@@ -1,6 +1,9 @@
 from pathlib import Path
+import os
+# Get the project root directory (parent of utils directory)
+_project_root = Path(__file__).parent.parent
 # CSV containing industries for dropdowns
-INDUSTRIES_CSV = Path("/workspaces/salarytransparency/data/Industries.csv")
+INDUSTRIES_CSV = _project_root / "data" / "Industries.csv"
 
 def get_industries() -> list:
     """
@@ -27,7 +30,7 @@ def get_industries() -> list:
     except Exception:
         return []
 # CSV containing nationalities for dropdowns
-NATIONALITIES_CSV = Path("/workspaces/salarytransparency/data/Nationalities.csv")
+NATIONALITIES_CSV = _project_root / "data" / "Nationalities.csv"
 
 def get_nationalities() -> list:
     """
@@ -53,21 +56,39 @@ def get_nationalities() -> list:
         return unique_sorted
     except Exception:
         return []
-from pathlib import Path
 import csv
 import threading
 import pandas as pd
 from datetime import datetime
-import fcntl
+import sys
+
+# Cross-platform file locking (fcntl only works on Unix)
+# On Windows, we rely on threading.Lock for synchronization
+if sys.platform == 'win32':
+    # Windows: use no-op locking (threading lock provides synchronization)
+    def lock_file(f):
+        pass
+    def unlock_file(f):
+        pass
+else:
+    # Unix/Linux: use fcntl for file-level locking
+    import fcntl
+    def lock_file(f):
+        fcntl.flock(f.fileno(), fcntl.LOCK_EX)
+    def unlock_file(f):
+        fcntl.flock(f.fileno(), fcntl.LOCK_UN)
+
+# Get the project root directory (parent of utils directory)
+_project_root = Path(__file__).parent.parent
 
 # Original preloaded CSV (read-only source of initial data)
-DATA_CSV = Path("/workspaces/salarytransparency/data/salary_data.csv")
+DATA_CSV = _project_root / "data" / "salary_data.csv"
 
 # New CSV file that will be the primary storage for all new submissions
-NEW_CSV = Path("/workspaces/salarytransparency/data/new_salary.csv")
+NEW_CSV = _project_root / "data" / "new_salary.csv"
 
 # CSV containing world cities/locations used for dropdowns
-WORLD_CITIES_CSV = Path("/workspaces/salarytransparency/data/worldcities.csv")
+WORLD_CITIES_CSV = _project_root / "data" / "worldcities.csv"
 
 # Canonical column order used by the app
 CANONICAL_COLUMNS = [
@@ -233,7 +254,7 @@ def save_submission(record: dict):
     with _lock:
         with open(NEW_CSV, "a+", newline="", encoding="utf-8") as f:
             try:
-                fcntl.flock(f.fileno(), fcntl.LOCK_EX)
+                lock_file(f)
                 f.seek(0)
                 content = f.read(1)
                 writer = csv.DictWriter(f, fieldnames=CANONICAL_COLUMNS)
@@ -243,7 +264,7 @@ def save_submission(record: dict):
                 f.seek(0, 2)
                 writer.writerow(row)
             finally:
-                fcntl.flock(f.fileno(), fcntl.LOCK_UN)
+                unlock_file(f)
 
 
 def get_locations() -> list:
