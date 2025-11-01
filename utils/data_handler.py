@@ -1,6 +1,8 @@
 import pandas as pd
 import os
 from datetime import datetime
+from sqlalchemy import text
+from utils.db_setup import get_db_engine, setup_database
 
 def clean_salary_data(df):
     """Clean and format salary data"""
@@ -11,7 +13,8 @@ def clean_salary_data(df):
         column_mapping = {
             'Monthly Gross Salary ZMW': 'Monthly Gross Salary (in ZMW)',
             'Company location': 'Company location (Country)',
-            'Salary Gross in USD (leave blank if you get paid in ZMW)': 'Salary Gross in USD'
+            'Salary Gross in USD (leave blank if you get paid in ZMW)': 'Salary Gross in USD',
+            'Degree (or not)': 'Degree'
         }
 
         for old_col, new_col in column_mapping.items():
@@ -65,7 +68,7 @@ def clean_salary_data(df):
         return df
 
 def load_data():
-    """Load salary data from Excel or CSV file"""
+    """Load salary data from PostgreSQL database"""
     # Define empty DataFrame with required columns
     empty_df = pd.DataFrame(columns=[
         'Role', 'Company location (Country)', 'Monthly Gross Salary (in ZMW)',
@@ -75,104 +78,160 @@ def load_data():
     ])
 
     try:
-        # Get the absolute path to the data directory
-        current_dir = os.path.dirname(os.path.abspath(__file__))
-        data_dir = os.path.join(os.path.dirname(current_dir), 'data')
-        excel_path = os.path.join(data_dir, 'salary_data.xlsx')
-        csv_path = os.path.join(data_dir, 'salary_data.csv')
-
-        print(f"Current working directory: {os.getcwd()}")
-        print(f"Looking for data files in: {data_dir}")
-        print(f"Excel path: {excel_path}")
-        print(f"CSV path: {csv_path}")
-        print(f"Excel file exists: {os.path.exists(excel_path)}")
-        print(f"CSV file exists: {os.path.exists(csv_path)}")
-
-        # Try to load Excel file first
-        if os.path.exists(excel_path):
-            print("Found Excel file, loading data...")
-            try:
-                df = pd.read_excel(excel_path)
-                print(f"Successfully read Excel file with {len(df)} rows")
-            except Exception as e:
-                print(f"Error reading Excel file: {str(e)}")
-                raise
-        # Fall back to CSV if Excel doesn't exist
-        elif os.path.exists(csv_path):
-            print("Found CSV file, loading data...")
-            try:
-                df = pd.read_csv(csv_path)
-                print(f"Successfully read CSV file with {len(df)} rows")
-            except Exception as e:
-                print(f"Error reading CSV file: {str(e)}")
-                raise
-        else:
-            print("No data files found, returning empty DataFrame")
+        # Try to load from PostgreSQL database
+        print("Attempting to load data from PostgreSQL database...")
+        engine = get_db_engine()
+        
+        # Ensure database and tables exist
+        setup_database()
+        
+        # Query data from database
+        query = """
+        SELECT 
+            role AS "Role",
+            company_location_country AS "Company location (Country)",
+            monthly_gross_salary_zmw AS "Monthly Gross Salary (in ZMW)",
+            salary_gross_usd AS "Salary Gross in USD",
+            years_of_experience AS "Years of Experience",
+            degree AS "Degree",
+            approx_employees AS "Approx. No. of employees in company",
+            your_country_location AS "Your Country/ Location",
+            nationality AS "Nationality",
+            industry AS "Industry",
+            submission_date AS "Submission Date"
+        FROM salary_data
+        ORDER BY submission_date DESC
+        """
+        
+        with engine.connect() as conn:
+            df = pd.read_sql(text(query), conn)
+        
+        if df.empty:
+            print("Database is empty, returning empty DataFrame")
             return empty_df
-
-        # Clean and format the data
-        print("Cleaning data...")
-        df = clean_salary_data(df)
-        print(f"Successfully loaded and cleaned {len(df)} rows of data")
-        print("Columns in final DataFrame:", df.columns.tolist())
+        
+        print(f"Successfully loaded {len(df)} rows from database")
+        
+        # Ensure proper data types
+        df['Submission Date'] = pd.to_datetime(df['Submission Date'])
+        
+        print(f"Columns in DataFrame: {df.columns.tolist()}")
         return df
+        
     except Exception as e:
-        print(f"Error loading data: {str(e)}")
+        print(f"Error loading data from database: {str(e)}")
         import traceback
         print("Full traceback:")
         print(traceback.format_exc())
+        print("Returning empty DataFrame")
         return empty_df
 
 def save_submission(data):
-    """Save new submission to the current data file"""
+    """Save new submission to PostgreSQL database"""
     # Add submission timestamp
     data['Submission Date'] = pd.Timestamp.now()
 
     try:
-        # Get the absolute path to the data directory
-        current_dir = os.path.dirname(os.path.abspath(__file__))
-        data_dir = os.path.join(os.path.dirname(current_dir), 'data')
-        excel_path = os.path.join(data_dir, 'salary_data.xlsx')
-        csv_path = os.path.join(data_dir, 'salary_data.csv')
-
-        df = load_data()
-        new_row = pd.DataFrame([data])
-
-        # If Excel file exists, append to it
-        if os.path.exists(excel_path):
-            df = pd.concat([df, new_row], ignore_index=True)
-            df.to_excel(excel_path, index=False)
-        else:
-            # Otherwise, append to CSV
-            if os.path.exists(csv_path):
-                df = pd.concat([df, new_row], ignore_index=True)
-            else:
-                df = new_row
-            df.to_csv(csv_path, index=False)
+        print("Attempting to save submission to PostgreSQL database...")
+        engine = get_db_engine()
+        
+        # Ensure database and tables exist
+        setup_database()
+        
+        # Prepare data for database insertion
+        insert_data = {
+            'role': data.get('Role'),
+            'company_location_country': data.get('Company location (Country)'),
+            'monthly_gross_salary_zmw': data.get('Monthly Gross Salary (in ZMW)'),
+            'salary_gross_usd': data.get('Salary Gross in USD'),
+            'years_of_experience': data.get('Years of Experience'),
+            'degree': data.get('Degree'),
+            'approx_employees': data.get('Approx. No. of employees in company'),
+            'your_country_location': data.get('Your Country/ Location'),
+            'nationality': data.get('Nationality'),
+            'industry': data.get('Industry'),
+            'submission_date': data.get('Submission Date')
+        }
+        
+        # Convert to DataFrame for easier insertion
+        new_row = pd.DataFrame([insert_data])
+        
+        # Insert into database
+        new_row.to_sql(
+            'salary_data',
+            engine,
+            if_exists='append',
+            index=False
+        )
+        
+        print("Successfully saved submission to database")
         return True
+        
     except Exception as e:
-        print(f"Error saving submission: {str(e)}")
+        print(f"Error saving submission to database: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return False
 
 def save_uploaded_file(df):
-    """Save uploaded Excel file data"""
+    """Save uploaded Excel/CSV file data to PostgreSQL database"""
     try:
-        # Get the absolute path to the data directory
-        current_dir = os.path.dirname(os.path.abspath(__file__))
-        data_dir = os.path.join(os.path.dirname(current_dir), 'data')
-        excel_path = os.path.join(data_dir, 'salary_data.xlsx')
-        csv_path = os.path.join(data_dir, 'salary_data.csv')
-
+        print("Attempting to save uploaded file data to PostgreSQL database...")
+        
         # Add submission timestamp for new entries if column doesn't exist
         if 'Submission Date' not in df.columns:
             df['Submission Date'] = pd.Timestamp.now()
 
         # Clean data before saving
         df = clean_salary_data(df)
-        # Save to both Excel and CSV for backup
-        df.to_excel(excel_path, index=False)
-        df.to_csv(csv_path, index=False)
+        
+        if df.empty:
+            print("No data to save after cleaning")
+            return False
+        
+        engine = get_db_engine()
+        
+        # Ensure database and tables exist
+        setup_database()
+        
+        # Map column names to database column names
+        column_mapping = {
+            'Role': 'role',
+            'Company location (Country)': 'company_location_country',
+            'Monthly Gross Salary (in ZMW)': 'monthly_gross_salary_zmw',
+            'Salary Gross in USD': 'salary_gross_usd',
+            'Years of Experience': 'years_of_experience',
+            'Degree': 'degree',
+            'Approx. No. of employees in company': 'approx_employees',
+            'Your Country/ Location': 'your_country_location',
+            'Nationality': 'nationality',
+            'Industry': 'industry',
+            'Submission Date': 'submission_date'
+        }
+        
+        # Rename columns for database
+        df_db = df.copy()
+        for old_col, new_col in column_mapping.items():
+            if old_col in df_db.columns:
+                df_db = df_db.rename(columns={old_col: new_col})
+        
+        # Ensure we only have columns that exist in the mapping
+        db_columns = [col for col in column_mapping.values() if col in df_db.columns]
+        df_db = df_db[db_columns]
+        
+        # Insert into database
+        df_db.to_sql(
+            'salary_data',
+            engine,
+            if_exists='append',
+            index=False
+        )
+        
+        print(f"Successfully saved {len(df_db)} rows to database")
         return True
+        
     except Exception as e:
-        print(f"Error saving uploaded file: {str(e)}")
+        print(f"Error saving uploaded file to database: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return False
