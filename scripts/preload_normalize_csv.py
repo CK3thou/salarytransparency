@@ -1,7 +1,7 @@
 """
 Normalize / clean the provided salary CSV in-place so the app can use it as primary storage.
 This script:
-- reads /workspaces/salarytransparency/data/salary_data.csv
+- reads data/salary_data.csv
 - normalizes column names to the app canonical names
 - removes empty rows
 - writes back in canonical column order
@@ -28,7 +28,7 @@ def normalize_inplace(csv_path: Path):
     print(f"Normalized and wrote {len(df)} rows to {csv_path}")
 
 if __name__ == "__main__":
-    csv_path = Path("/workspaces/salarytransparency/data/salary_data.csv")
+    csv_path = DATA_CSV
     if not csv_path.exists():
         print("CSV not found:", csv_path)
     else:

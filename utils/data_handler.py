@@ -1,6 +1,11 @@
 from pathlib import Path
+
+# Get the project root directory (parent of utils directory)
+PROJECT_ROOT = Path(__file__).parent.parent
+DATA_DIR = PROJECT_ROOT / "data"
+
 # CSV containing industries for dropdowns
-INDUSTRIES_CSV = Path("/workspaces/salarytransparency/data/Industries.csv")
+INDUSTRIES_CSV = DATA_DIR / "Industries.csv"
 
 def get_industries() -> list:
     """
@@ -27,7 +32,7 @@ def get_industries() -> list:
     except Exception:
         return []
 # CSV containing nationalities for dropdowns
-NATIONALITIES_CSV = Path("/workspaces/salarytransparency/data/Nationalities.csv")
+NATIONALITIES_CSV = DATA_DIR / "Nationalities.csv"
 
 def get_nationalities() -> list:
     """
@@ -61,13 +66,13 @@ from datetime import datetime
 import fcntl
 
 # Original preloaded CSV (read-only source of initial data)
-DATA_CSV = Path("/workspaces/salarytransparency/data/salary_data.csv")
+DATA_CSV = DATA_DIR / "salary_data.csv"
 
 # New CSV file that will be the primary storage for all new submissions
-NEW_CSV = Path("/workspaces/salarytransparency/data/new_salary.csv")
+NEW_CSV = DATA_DIR / "new_salary.csv"
 
 # CSV containing world cities/locations used for dropdowns
-WORLD_CITIES_CSV = Path("/workspaces/salarytransparency/data/worldcities.csv")
+WORLD_CITIES_CSV = DATA_DIR / "worldcities.csv"
 
 # Canonical column order used by the app
 CANONICAL_COLUMNS = [

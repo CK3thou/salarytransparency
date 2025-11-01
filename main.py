@@ -6,16 +6,24 @@ import sys
 # emit repeated "missing ScriptRunContext" warnings. Detect that case
 # early and print a helpful message before any Streamlit import.
 if __name__ == "__main__":
-    # Common Streamlit environment keys that are present when run via
-    # `streamlit run`. If none are found, assume bare python execution.
-    streamlit_keys = ("STREAMLIT_RUN_MAIN", "STREAMLIT_SERVER_PORT", "STREAMLIT_BROWSER_GZIP")
-    if not any(k in os.environ for k in streamlit_keys):
-        print("This is a Streamlit app. To run it in a browser, use:")
-        print("    streamlit run c:/Users/justthatuser/Documents/GitHub/salarytransparency/main.py")
+    # Check if we're being run via streamlit by trying to import the streamlit module
+    # If streamlit can be imported and we can detect its runtime, we're running via streamlit
+    try:
+        import streamlit
+        # If streamlit is available, check if it's actually running
+        # We'll let the app continue and check properly later in main()
+    except ImportError:
+        # Streamlit not installed, definitely bare python
+        print("This is a Streamlit app. To run it in a browser, first install dependencies:")
+        print("    pip install -r requirements.txt")
+        print("Then use:")
+        print(f"    streamlit run {os.path.abspath(__file__)}")
         sys.exit(0)
 
 import streamlit as st
 import pandas as pd
+import plotly.express as px
+import plotly.graph_objects as go
 from utils.data_handler import load_data, save_submission, load_preloaded_data
 from utils.visualizations import (
     create_salary_distribution, create_experience_salary_correlation,
@@ -34,6 +42,9 @@ st.set_page_config(
 )
 
 def main():
+    st.title("Salary Transparency")
+    st.subheader("Exploring salary data across industries and locations")
+
     # Detect whether the app is being run via `streamlit run` (script run context).
     # When running the script directly with `python main.py`, Streamlit's
     # ScriptRunContext is not available and features like session state
@@ -49,7 +60,7 @@ def main():
     if ctx is None:
         # Running in bare mode / direct python execution
         print("This is a Streamlit app. To run it in a browser, use:")
-        print("    streamlit run c:/Users/justthatuser/Documents/GitHub/salarytransparency/main.py")
+        print(f"    streamlit run {os.path.abspath(__file__)}")
         print("Session state and other Streamlit runtime features are unavailable when running with `python`.")
         return
     # PWA Setup
@@ -102,22 +113,7 @@ def main():
             body {
                 -webkit-tap-highlight-color: transparent;
                 -webkit-touch-callout: none;
-                -webkit-user-select: none;                cd /workspaces/salarytransparency
-                
-                # stage all changes and commit (no-op if nothing to commit)
-                git add -A
-                git commit -m "Save workspace changes" || echo "No changes to commit"
-                
-                # show resulting repo state
-                git status --porcelain -b
-                ```cd /workspaces/salarytransparency
-                
-                # stage all changes and commit (no-op if nothing to commit)
-                git add -A
-                git commit -m "Save workspace changes" || echo "No changes to commit"
-                
-                # show resulting repo state
-                git status --porcelain -b
+                -webkit-user-select: none;
                 user-select: none;
             }
             /* Smooth scrolling */
@@ -127,8 +123,6 @@ def main():
             }
         </style>
     """, unsafe_allow_html=True)
-
-    st.title("Salary Transparency Platform")
 
     # Load data with debug information
     st.write("Loading data...")
@@ -239,7 +233,4 @@ def main():
         st.dataframe(combined_df)
 
 if __name__ == "__main__":
-    os.system('pip install -r .\\requirements.txt')
-    os.system('streamlit run .\\main.py')
-    #os.system('taskkill /F /IM streamlit.exe')
     main()
