@@ -6,11 +6,17 @@ import sys
 # emit repeated "missing ScriptRunContext" warnings. Detect that case
 # early and print a helpful message before any Streamlit import.
 if __name__ == "__main__":
-    # Common Streamlit environment keys that are present when run via
-    # `streamlit run`. If none are found, assume bare python execution.
-    streamlit_keys = ("STREAMLIT_RUN_MAIN", "STREAMLIT_SERVER_PORT", "STREAMLIT_BROWSER_GZIP")
-    if not any(k in os.environ for k in streamlit_keys):
-        print("This is a Streamlit app. To run it in a browser, use:")
+    # Check if we're being run via streamlit by trying to import the streamlit module
+    # If streamlit can be imported and we can detect its runtime, we're running via streamlit
+    try:
+        import streamlit
+        # If streamlit is available, check if it's actually running
+        # We'll let the app continue and check properly later in main()
+    except ImportError:
+        # Streamlit not installed, definitely bare python
+        print("This is a Streamlit app. To run it in a browser, first install dependencies:")
+        print("    pip install -r requirements.txt")
+        print("Then use:")
         print(f"    streamlit run {os.path.abspath(__file__)}")
         sys.exit(0)
 
