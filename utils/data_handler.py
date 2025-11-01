@@ -1,5 +1,4 @@
 from pathlib import Path
-import os
 
 # Get the project root directory (parent of utils directory)
 PROJECT_ROOT = Path(__file__).parent.parent

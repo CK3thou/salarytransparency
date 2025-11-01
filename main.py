@@ -233,7 +233,5 @@ def main():
         st.dataframe(combined_df)
 
 if __name__ == "__main__":
-    os.system('pip install -r .\\requirements.txt')
-    os.system('streamlit run .\\main.py')
-    #os.system('taskkill /F /IM streamlit.exe')
+    main()
     main()
