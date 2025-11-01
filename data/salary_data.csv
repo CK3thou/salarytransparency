@@ -1,4 +1,4 @@
-Role,Company location,Monthly Gross Salary ZMW,Salary Gross in USD (leave blank if you get paid in ZMW),Years of Experience,Degree (or not),Approx. No. of employees in company,Your Country/ Location,Nationality,Industry,Unnamed: 10,Unnamed: 11,Real-time USD ZMW exchange rate
+Role,Company location,Monthly Gross Salary (in ZMW),Salary Gross in USD,Years of Experience,Degree,Approx. No. of employees in company,Your Country/ Location,Nationality,Industry,Submission Date,Real-time USD ZMW exchange rate
 Systems Administrator,Lusaka,17871,700.00,7,Yes,,Zambia,Zambian,Foreign Mission,,,28.6050845
 Customer Support Agent,Remote,58719,2300,3,No,200,Zambia,,Tech,,,28.6050845
 Cloud Support Technician,Remote,84249,3300.00,6,No,900,Zambia,Zambian,Tech,,,28.6050845
@@ -42,23 +42,23 @@ PR Account Executive ,Lusaka ,8500,,3,,,,,,,,28.6050845
 Data Manager,Lusaka,9000.00,,4,yes,,,,FCMG,,,28.6050845
 bank teller,lusaka,9500.00,,5,No,,Zambia ,Zambian ,banking,,,28.6050845
 ,,,,,,,,,,,,28.6050845
+,,,,,,,,,,,2023-08-01,28.6050845
 ,,,,,,,,,,,,28.6050845
+,,,,,,,,,,,2023-09-15,28.6050845
 ,,,,,,,,,,,,28.6050845
+,,,,,,,,,,,2023-10-30,28.6050845
 ,,,,,,,,,,,,28.6050845
+,,,,,,,,,,,2023-12-14,28.6050845
 ,,,,,,,,,,,,28.6050845
+,,,,,,,,,,,2024-01-28,28.6050845
 ,,,,,,,,,,,,28.6050845
+,,,,,,,,,,,2024-03-12,28.6050845
 ,,,,,,,,,,,,28.6050845
+,,,,,,,,,,,2024-04-26,28.6050845
 ,,,,,,,,,,,,28.6050845
+,,,,,,,,,,,2024-06-09,28.6050845
 ,,,,,,,,,,,,28.6050845
-,,,,,,,,,,,,28.6050845
-,,,,,,,,,,,,28.6050845
-,,,,,,,,,,,,28.6050845
-,,,,,,,,,,,,28.6050845
-,,,,,,,,,,,,28.6050845
-,,,,,,,,,,,,28.6050845
-,,,,,,,,,,,,28.6050845
-,,,,,,,,,,,,28.6050845
-,,,,,,,,,,,,28.6050845
+,,,,,,,,,,,2024-07-24,28.6050845
 ,,,,,,,,,,,,28.6050845
 ,,,,,,,,,,,,28.6050845
 ,,,,,,,,,,,,28.6050845

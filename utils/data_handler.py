@@ -1,177 +1,273 @@
+from pathlib import Path
+# CSV containing industries for dropdowns
+INDUSTRIES_CSV = Path("/workspaces/salarytransparency/data/Industries.csv")
+
+def get_industries() -> list:
+    """
+    Return a sorted list of industries from the Industries CSV.
+    Falls back to an empty list if the file isn't present or cannot be read.
+    """
+    try:
+        if not INDUSTRIES_CSV.exists():
+            return []
+        import pandas as pd
+        df = pd.read_csv(INDUSTRIES_CSV, dtype=str, keep_default_na=False)
+        if df.empty:
+            return []
+        # Prefer a column named 'Industry' but fall back to the first column
+        if 'Industry' in df.columns:
+            series = df['Industry']
+        else:
+            series = df.iloc[:, 0]
+        # Normalize entries: strip whitespace and quotes, remove empties
+        inds = series.astype(str).str.strip().str.strip('"').tolist()
+        inds = [i for i in inds if i and i.lower() not in ('nan', 'none', 'industry')]
+        unique_sorted = sorted(set(inds))
+        return unique_sorted
+    except Exception:
+        return []
+# CSV containing nationalities for dropdowns
+NATIONALITIES_CSV = Path("/workspaces/salarytransparency/data/Nationalities.csv")
+
+def get_nationalities() -> list:
+    """
+    Return a sorted list of nationalities from the Nationalities CSV.
+    Falls back to an empty list if the file isn't present or cannot be read.
+    """
+    try:
+        if not NATIONALITIES_CSV.exists():
+            return []
+        import pandas as pd
+        df = pd.read_csv(NATIONALITIES_CSV, dtype=str, keep_default_na=False)
+        if df.empty:
+            return []
+        # Prefer a column named 'Nationality' but fall back to the first column
+        if 'Nationality' in df.columns:
+            series = df['Nationality']
+        else:
+            series = df.iloc[:, 0]
+        # Normalize entries: strip whitespace and quotes, remove empties
+        nats = series.astype(str).str.strip().str.strip('"').tolist()
+        nats = [n for n in nats if n and n.lower() not in ('nan', 'none')]
+        unique_sorted = sorted(set(nats))
+        return unique_sorted
+    except Exception:
+        return []
+from pathlib import Path
+import csv
+import threading
 import pandas as pd
-import os
 from datetime import datetime
+import fcntl
 
-def clean_salary_data(df):
-    """Clean and format salary data"""
-    try:
-        print("Original columns:", df.columns.tolist())  # Debug print
+# Original preloaded CSV (read-only source of initial data)
+DATA_CSV = Path("/workspaces/salarytransparency/data/salary_data.csv")
 
-        # Rename columns first
-        column_mapping = {
-            'Monthly Gross Salary ZMW': 'Monthly Gross Salary (in ZMW)',
-            'Company location': 'Company location (Country)',
-            'Salary Gross in USD (leave blank if you get paid in ZMW)': 'Salary Gross in USD'
-        }
+# New CSV file that will be the primary storage for all new submissions
+NEW_CSV = Path("/workspaces/salarytransparency/data/new_salary.csv")
 
-        for old_col, new_col in column_mapping.items():
-            if old_col in df.columns:
-                df = df.rename(columns={old_col: new_col})
+# CSV containing world cities/locations used for dropdowns
+WORLD_CITIES_CSV = Path("/workspaces/salarytransparency/data/worldcities.csv")
 
-        print("Columns after renaming:", df.columns.tolist())  # Debug print
+# Canonical column order used by the app
+CANONICAL_COLUMNS = [
+    "Role",
+    "Company location",
+    "Monthly Gross Salary (in ZMW)",
+    "Salary Gross in USD",
+    "Years of Experience",
+    "Degree",
+    "Approx. No. of employees in company",
+    "Your Country/ Location",
+    "Nationality",
+    "Industry",
+    "Submission Date",
+    "Real-time USD ZMW exchange rate"
+]
 
-        # Replace '#VALUE!' with NaN
-        df['Monthly Gross Salary (in ZMW)'] = pd.to_numeric(df['Monthly Gross Salary (in ZMW)'], errors='coerce')
+_lock = threading.Lock()
 
-        # Clean up salary columns
-        df['Salary Gross in USD'] = pd.to_numeric(df['Salary Gross in USD'], errors='coerce')
+def _ensure_csv_exists(path: Path):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if not path.exists():
+        with path.open("w", newline="", encoding="utf-8") as f:
+            writer = csv.writer(f)
+            writer.writerow(CANONICAL_COLUMNS)
 
-        # Clean up years of experience
-        df['Years of Experience'] = df['Years of Experience'].astype(str)
-        df['Years of Experience'] = df['Years of Experience'].str.extract('(\d+)', expand=False)
-        df['Years of Experience'] = pd.to_numeric(df['Years of Experience'], errors='coerce')
-
-        # Remove unnecessary columns
-        columns_to_keep = [
-            'Role', 'Company location (Country)', 'Monthly Gross Salary (in ZMW)',
-            'Salary Gross in USD', 'Years of Experience', 'Degree',
-            'Approx. No. of employees in company', 'Your Country/ Location',
-            'Nationality', 'Industry', 'Submission Date'
-        ]
-
-        # Ensure all required columns exist
-        for col in columns_to_keep:
-            if col not in df.columns:
-                if col == 'Submission Date':
-                    df[col] = pd.Timestamp.now()  # Use current time for existing entries
-                else:
-                    df[col] = None
-
-        df = df[columns_to_keep]
-
-        # Drop rows where all values are NaN
-        df = df.dropna(how='all')
-
-        # Drop rows where salary is NaN
-        df = df.dropna(subset=['Monthly Gross Salary (in ZMW)'])
-
-        print("Final columns:", df.columns.tolist())  # Debug print
-        print("Number of rows after cleaning:", len(df))  # Debug print
-
-        return df
-    except Exception as e:
-        print(f"Error cleaning data: {str(e)}")
-        return df
-
-def load_data():
-    """Load salary data from Excel or CSV file"""
-    # Define empty DataFrame with required columns
-    empty_df = pd.DataFrame(columns=[
-        'Role', 'Company location (Country)', 'Monthly Gross Salary (in ZMW)',
-        'Salary Gross in USD', 'Years of Experience', 'Degree',
-        'Approx. No. of employees in company', 'Your Country/ Location',
-        'Nationality', 'Industry', 'Submission Date'
-    ])
-
-    try:
-        # Get the absolute path to the data directory
-        current_dir = os.path.dirname(os.path.abspath(__file__))
-        data_dir = os.path.join(os.path.dirname(current_dir), 'data')
-        excel_path = os.path.join(data_dir, 'salary_data.xlsx')
-        csv_path = os.path.join(data_dir, 'salary_data.csv')
-
-        print(f"Current working directory: {os.getcwd()}")
-        print(f"Looking for data files in: {data_dir}")
-        print(f"Excel path: {excel_path}")
-        print(f"CSV path: {csv_path}")
-        print(f"Excel file exists: {os.path.exists(excel_path)}")
-        print(f"CSV file exists: {os.path.exists(csv_path)}")
-
-        # Try to load Excel file first
-        if os.path.exists(excel_path):
-            print("Found Excel file, loading data...")
-            try:
-                df = pd.read_excel(excel_path)
-                print(f"Successfully read Excel file with {len(df)} rows")
-            except Exception as e:
-                print(f"Error reading Excel file: {str(e)}")
-                raise
-        # Fall back to CSV if Excel doesn't exist
-        elif os.path.exists(csv_path):
-            print("Found CSV file, loading data...")
-            try:
-                df = pd.read_csv(csv_path)
-                print(f"Successfully read CSV file with {len(df)} rows")
-            except Exception as e:
-                print(f"Error reading CSV file: {str(e)}")
-                raise
+def _map_columns(df: pd.DataFrame) -> pd.DataFrame:
+    col_map = {
+        "Company location": "Company location",
+        "Company location (Country)": "Company location",
+        "Monthly Gross Salary ZMW": "Monthly Gross Salary (in ZMW)",
+        "Monthly Gross Salary (in ZMW)": "Monthly Gross Salary (in ZMW)",
+        "Salary Gross in USD (leave blank if you get paid in ZMW)": "Salary Gross in USD",
+        "Salary Gross in USD": "Salary Gross in USD",
+        "Years of Experience": "Years of Experience",
+        "Degree (or not)": "Degree",
+        "Degree": "Degree",
+        "Approx. No. of employees in company": "Approx. No. of employees in company",
+        "Your Country/ Location": "Your Country/ Location",
+        "Nationality": "Nationality",
+        "Industry": "Industry",
+        "Real-time USD ZMW exchange rate": "Real-time USD ZMW exchange rate",
+        "Submission Date": "Submission Date",
+        "Role": "Role",
+        "role": "Role"
+    }
+    new_cols = {}
+    for c in df.columns:
+        mapped = col_map.get(c, None)
+        if mapped:
+            new_cols[c] = mapped
         else:
-            print("No data files found, returning empty DataFrame")
-            return empty_df
+            new_cols[c] = c
+    df = df.rename(columns=new_cols)
+    for col in CANONICAL_COLUMNS:
+        if col not in df.columns:
+            df[col] = ""
+    # Ensure compatibility column for display
+    if "Company location" in df.columns and "Company location (Country)" not in df.columns:
+        df["Company location (Country)"] = df["Company location"]
+    # If both exist but "Company location (Country)" is empty, fill from "Company location"
+    if "Company location (Country)" in df.columns and "Company location" in df.columns:
+        df["Company location (Country)"] = df["Company location (Country)"].replace("", pd.NA).fillna(df["Company location"])
+    df = df[CANONICAL_COLUMNS]
+    return df
 
-        # Clean and format the data
-        print("Cleaning data...")
-        df = clean_salary_data(df)
-        print(f"Successfully loaded and cleaned {len(df)} rows of data")
-        print("Columns in final DataFrame:", df.columns.tolist())
+def _read_csv_safe(path: Path) -> pd.DataFrame:
+    if not path.exists():
+        return pd.DataFrame(columns=CANONICAL_COLUMNS)
+    try:
+        df = pd.read_csv(path, dtype=str, keep_default_na=False)
+        if df.empty:
+            return pd.DataFrame(columns=CANONICAL_COLUMNS)
+        df = _map_columns(df)
+        # Ensure compatibility column used elsewhere
+        if "Company location" in df.columns and "Company location (Country)" not in df.columns:
+            df["Company location (Country)"] = df["Company location"]
+        # normalize numeric fields
+        df["Monthly Gross Salary (in ZMW)"] = pd.to_numeric(df["Monthly Gross Salary (in ZMW)"], errors="coerce")
+        df["Salary Gross in USD"] = pd.to_numeric(df["Salary Gross in USD"], errors="coerce")
+        # parse submission date safely and avoid future downcasting warning
+        dates = pd.to_datetime(df["Submission Date"], errors="coerce")
+        try:
+            dates = dates.infer_objects(copy=False)
+        except Exception:
+            pass
+        dates = dates.fillna(pd.Timestamp.utcnow())
+        df["Submission Date"] = dates.astype("datetime64[ns]")
         return df
-    except Exception as e:
-        print(f"Error loading data: {str(e)}")
-        import traceback
-        print("Full traceback:")
-        print(traceback.format_exc())
-        return empty_df
+    except Exception:
+        return pd.DataFrame(columns=CANONICAL_COLUMNS)
 
-def save_submission(data):
-    """Save new submission to the current data file"""
-    # Add submission timestamp
-    data['Submission Date'] = pd.Timestamp.now()
+def load_preloaded_data() -> pd.DataFrame:
+    """
+    Return the preloaded data (from DATA_CSV) with Submission Date set to 2022-01-01
+    so preloaded rows show the requested fixed submission date.
+    """
+    base = _read_csv_safe(DATA_CSV)
+    if base.empty:
+        return pd.DataFrame(columns=CANONICAL_COLUMNS)
+    # set Submission Date to 2022-01-01 for all preloaded rows
+    base["Submission Date"] = pd.to_datetime("2022-01-01")
+    # ensure compatibility column name expected elsewhere
+    if "Company location" in base.columns and "Company location (Country)" not in base.columns:
+        base["Company location (Country)"] = base["Company location"]
+    return base
 
+def load_data() -> pd.DataFrame:
+    """
+    Load preloaded data (salary_data.csv) and any new submissions (new_salary.csv),
+    concatenate them and return a single DataFrame the app will use.
+    """
+    # ensure new file exists (header) so save_submission can append later
+    _ensure_csv_exists(NEW_CSV)
+
+    # base_df should be read without overriding dates here (preloaded dates are set via load_preloaded_data)
+    base_df = _read_csv_safe(DATA_CSV)
+    new_df = _read_csv_safe(NEW_CSV)
+
+    if base_df.empty and new_df.empty:
+        return pd.DataFrame(columns=CANONICAL_COLUMNS)
+
+    combined = pd.concat([base_df, new_df], ignore_index=True, sort=False)
+    # keep canonical columns and compatibility name expected by filters
+    if "Company location" in combined.columns and "Company location (Country)" not in combined.columns:
+        combined["Company location (Country)"] = combined["Company location"]
+    return combined
+
+def save_submission(record: dict):
+    """
+    Append a single submission to NEW_CSV. This file is the primary storage for new entries.
+    Uses an exclusive file lock to avoid concurrent write corruption.
+    """
+    _ensure_csv_exists(NEW_CSV)
+
+    mapping_preferences = {
+        "Role": ["Role", "role"],
+        "Company location": ["Company location", "company_location", "Company location (Country)"],
+        "Monthly Gross Salary (in ZMW)": ["Monthly Gross Salary (in ZMW)", "Monthly Gross Salary ZMW", "monthly_gross_salary_zmw"],
+        "Salary Gross in USD": ["Salary Gross in USD", "Salary Gross in USD (leave blank if you get paid in ZMW)", "salary_gross_usd"],
+        "Years of Experience": ["Years of Experience", "years_of_experience"],
+        "Degree": ["Degree", "Degree (or not)", "degree"],
+        "Approx. No. of employees in company": ["Approx. No. of employees in company", "approx_no_of_employees"],
+        "Your Country/ Location": ["Your Country/ Location", "country_location"],
+        "Nationality": ["Nationality", "nationality"],
+        "Industry": ["Industry", "industry"],
+        "Submission Date": ["Submission Date", "submission_date"],
+        "Real-time USD ZMW exchange rate": ["Real-time USD ZMW exchange rate", "realtime_usd_zmw_rate"]
+    }
+
+    row = {}
+    for canonical, keys in mapping_preferences.items():
+        val = None
+        for k in keys:
+            if k in record and record.get(k) not in (None, ""):
+                val = record.get(k)
+                break
+        if canonical == "Submission Date" and not val:
+            val = datetime.utcnow().isoformat(sep=" ")
+        row[canonical] = "" if val is None else val
+
+    # append to NEW_CSV with file lock
+    with _lock:
+        with open(NEW_CSV, "a+", newline="", encoding="utf-8") as f:
+            try:
+                fcntl.flock(f.fileno(), fcntl.LOCK_EX)
+                f.seek(0)
+                content = f.read(1)
+                writer = csv.DictWriter(f, fieldnames=CANONICAL_COLUMNS)
+                if not content:
+                    f.seek(0)
+                    writer.writeheader()
+                f.seek(0, 2)
+                writer.writerow(row)
+            finally:
+                fcntl.flock(f.fileno(), fcntl.LOCK_UN)
+
+
+def get_locations() -> list:
+    """
+    Return a sorted list of locations from the worldcities CSV.
+    Falls back to an empty list if the file isn't present or cannot be read.
+    """
     try:
-        # Get the absolute path to the data directory
-        current_dir = os.path.dirname(os.path.abspath(__file__))
-        data_dir = os.path.join(os.path.dirname(current_dir), 'data')
-        excel_path = os.path.join(data_dir, 'salary_data.xlsx')
-        csv_path = os.path.join(data_dir, 'salary_data.csv')
-
-        df = load_data()
-        new_row = pd.DataFrame([data])
-
-        # If Excel file exists, append to it
-        if os.path.exists(excel_path):
-            df = pd.concat([df, new_row], ignore_index=True)
-            df.to_excel(excel_path, index=False)
+        if not WORLD_CITIES_CSV.exists():
+            return []
+        # Use pandas for robust CSV parsing (handles quoted values)
+        df = pd.read_csv(WORLD_CITIES_CSV, dtype=str, keep_default_na=False)
+        if df.empty:
+            return []
+        # Prefer a column named 'Location' but fall back to the first column
+        if 'Location' in df.columns:
+            series = df['Location']
         else:
-            # Otherwise, append to CSV
-            if os.path.exists(csv_path):
-                df = pd.concat([df, new_row], ignore_index=True)
-            else:
-                df = new_row
-            df.to_csv(csv_path, index=False)
-        return True
-    except Exception as e:
-        print(f"Error saving submission: {str(e)}")
-        return False
-
-def save_uploaded_file(df):
-    """Save uploaded Excel file data"""
-    try:
-        # Get the absolute path to the data directory
-        current_dir = os.path.dirname(os.path.abspath(__file__))
-        data_dir = os.path.join(os.path.dirname(current_dir), 'data')
-        excel_path = os.path.join(data_dir, 'salary_data.xlsx')
-        csv_path = os.path.join(data_dir, 'salary_data.csv')
-
-        # Add submission timestamp for new entries if column doesn't exist
-        if 'Submission Date' not in df.columns:
-            df['Submission Date'] = pd.Timestamp.now()
-
-        # Clean data before saving
-        df = clean_salary_data(df)
-        # Save to both Excel and CSV for backup
-        df.to_excel(excel_path, index=False)
-        df.to_csv(csv_path, index=False)
-        return True
-    except Exception as e:
-        print(f"Error saving uploaded file: {str(e)}")
-        return False
+            series = df.iloc[:, 0]
+        # Normalize entries: strip whitespace and quotes, remove empties
+        locs = series.astype(str).str.strip().str.strip('"').tolist()
+        # Filter out blanks and duplicates, sort alphabetically
+        locs = [l for l in locs if l and l.lower() not in ('nan', 'none')]
+        unique_sorted = sorted(set(locs))
+        return unique_sorted
+    except Exception:
+        return []

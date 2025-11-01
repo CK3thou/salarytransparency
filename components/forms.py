@@ -1,6 +1,7 @@
 import streamlit as st
 from forex_python.converter import CurrencyRates
 from datetime import datetime
+from utils.data_handler import get_locations, get_nationalities, get_industries
 
 def get_exchange_rate():
     """Get current exchange rate from USD to ZMW"""
@@ -21,13 +22,26 @@ def submission_form(save_callback):
         if rate:
             st.info(f"Current USD to ZMW rate: {rate:.2f}")
 
+    # Load location options for dropdowns (cached in data handler if desired)
+    _locations = get_locations()
+    _location_options = ["Select location"] + _locations
+    _nationalities = get_nationalities()
+    _nationality_options = ["Select nationality"] + _nationalities
+    _industries = get_industries()
+    _industry_options = ["Select industry"] + _industries
+
     with st.form("salary_submission_form"):
         # Use columns for better mobile layout
         col1, col2 = st.columns(2)
 
         with col1:
             role = st.text_input("Role*", key="role_mobile")
-            company_location = st.text_input("Company Location*", key="location_mobile")
+            company_location = st.selectbox(
+                "Company Location*",
+                options=_location_options,
+                index=0,
+                key="location_mobile",
+            )
             
             # Salary inputs with currency conversion
             salary_zmw = st.number_input(
@@ -79,9 +93,24 @@ def submission_form(save_callback):
                 value=1,
                 key="employees_mobile"
             )
-            your_location = st.text_input("Your Location*", key="your_location_mobile")
-            nationality = st.text_input("Nationality*", key="nationality_mobile")
-            industry = st.text_input("Industry*", key="industry_mobile")
+            your_location = st.selectbox(
+                "Your Location*",
+                options=_location_options,
+                index=0,
+                key="your_location_mobile",
+            )
+            nationality = st.selectbox(
+                "Nationality*",
+                options=_nationality_options,
+                index=0,
+                key="nationality_mobile",
+            )
+            industry = st.selectbox(
+                "Industry*",
+                options=_industry_options,
+                index=0,
+                key="industry_mobile",
+            )
 
         st.markdown("""
             <style>
@@ -99,10 +128,43 @@ def submission_form(save_callback):
         submitted = st.form_submit_button("Submit")
 
         if submitted:
+            # Treat the sentinel choice as empty so validation works as before
+            if company_location == "Select location":
+                company_location = ""
+            if your_location == "Select location":
+                your_location = ""
             # You can do conversion logic here after submission
-            if not all([role, company_location, salary_zmw, experience, 
-                       your_location, nationality, industry]):
-                st.error("Please fill in all required fields.")
+            if company_location == "Select location":
+                company_location = ""
+            if your_location == "Select location":
+                your_location = ""
+            if nationality == "Select nationality":
+                nationality = ""
+            if company_location == "Select location":
+                company_location = ""
+            if your_location == "Select location":
+                your_location = ""
+            if nationality == "Select nationality":
+                nationality = ""
+            if industry == "Select industry":
+                industry = ""
+            missing_fields = []
+            if not role:
+                missing_fields.append("Role")
+            if not company_location:
+                missing_fields.append("Company Location")
+            if not salary_zmw:
+                missing_fields.append("Monthly Salary (ZMW)")
+            if not experience:
+                missing_fields.append("Years of Experience")
+            if not your_location:
+                missing_fields.append("Your Location")
+            if not nationality:
+                missing_fields.append("Nationality")
+            if not industry:
+                missing_fields.append("Industry")
+            if missing_fields:
+                st.error(f"Please fill in all required fields. Missing: {', '.join(missing_fields)}")
                 return False
 
             data = {
@@ -120,6 +182,7 @@ def submission_form(save_callback):
 
             if save_callback(data):
                 st.success("Thank you for your submission!")
+                st.experimental_rerun()
                 return True
             else:
                 st.error("An error occurred while saving your submission.")

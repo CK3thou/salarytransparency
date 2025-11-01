@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-from utils.data_handler import load_data, save_submission
+from utils.data_handler import load_data, save_submission, load_preloaded_data
 from utils.visualizations import (
     create_salary_distribution, create_experience_salary_correlation,
     create_industry_salary_box, create_degree_distribution,
@@ -68,7 +68,22 @@ def main():
             body {
                 -webkit-tap-highlight-color: transparent;
                 -webkit-touch-callout: none;
-                -webkit-user-select: none;
+                -webkit-user-select: none;                cd /workspaces/salarytransparency
+                
+                # stage all changes and commit (no-op if nothing to commit)
+                git add -A
+                git commit -m "Save workspace changes" || echo "No changes to commit"
+                
+                # show resulting repo state
+                git status --porcelain -b
+                ```cd /workspaces/salarytransparency
+                
+                # stage all changes and commit (no-op if nothing to commit)
+                git add -A
+                git commit -m "Save workspace changes" || echo "No changes to commit"
+                
+                # show resulting repo state
+                git status --porcelain -b
                 user-select: none;
             }
             /* Smooth scrolling */
@@ -87,99 +102,107 @@ def main():
     st.write(f"Data loaded with {len(df)} rows")
 
     # Main content
-    st.subheader("Salary Data Overview")
+    st.subheader("Submissions")
 
     if not df.empty:
-        # Country selection - full width on mobile
-        selected_country = country_filter(df)
+        # Responsive metrics layout
+        metrics = st.columns([1, 1, 1])
+        with metrics[0]:
+            st.metric("Total Entries", len(df))
+        with metrics[1]:
+            avg_salary = df['Monthly Gross Salary (in ZMW)'].mean()
+            st.metric("Average Salary (ZMW)", f"{avg_salary:,.2f}")
+        with metrics[2]:
+            unique_roles = len(df['Role'].unique())
+            st.metric("Unique Roles", unique_roles)
 
-        # Filter data by country
-        if selected_country and selected_country != 'All Countries':
-            country_data = df[df['Company location (Country)'] == selected_country]
-        else:
-            country_data = df
+        # Create tabs for different visualizations
+        tab1, tab2, tab3, tab4, tab5 = st.tabs([
+            "Salary Distribution", "Experience Impact",
+            "Industry Analysis", "Education Impact",
+            "Role Analysis"
+        ])
 
-        if not country_data.empty:
-            # Responsive metrics layout
-            metrics = st.columns([1, 1, 1])
-            with metrics[0]:
-                st.metric("Total Entries", len(country_data))
-            with metrics[1]:
-                avg_salary = country_data['Monthly Gross Salary (in ZMW)'].mean()
-                st.metric("Average Salary (ZMW)", f"{avg_salary:,.2f}")
-            with metrics[2]:
-                unique_roles = len(country_data['Role'].unique())
-                st.metric("Unique Roles", unique_roles)
-
-            # Create tabs for different visualizations
-            tab1, tab2, tab3, tab4, tab5 = st.tabs([
-                "Salary Distribution", "Experience Impact",
-                "Industry Analysis", "Education Impact",
-                "Role Analysis"
-            ])
-
-            with tab1:
-                st.plotly_chart(
-                    create_salary_distribution(country_data),
-                    use_container_width=True,
-                    config={'responsive': True}
-                )
-
-            with tab2:
-                st.plotly_chart(
-                    create_experience_salary_correlation(country_data),
-                    use_container_width=True,
-                    config={'responsive': True}
-                )
-
-            with tab3:
-                st.plotly_chart(
-                    create_industry_salary_box(country_data),
-                    use_container_width=True,
-                    config={'responsive': True}
-                )
-
-            with tab4:
-                st.plotly_chart(
-                    create_degree_distribution(country_data),
-                    use_container_width=True,
-                    config={'responsive': True}
-                )
-
-            with tab5:
-                st.plotly_chart(
-                    create_top_roles_salary(country_data),
-                    use_container_width=True,
-                    config={'responsive': True}
-                )
-
-            # Data table with horizontal scroll on mobile
-            st.subheader("Detailed Data")
-            st.markdown('<div class="table-container">', unsafe_allow_html=True)
-            display_df = country_data[[
-                'Role', 'Monthly Gross Salary (in ZMW)',
-                'Salary Gross in USD', 'Years of Experience',
-                'Industry', 'Company location (Country)',
-                'Submission Date'
-            ]].sort_values('Submission Date', ascending=False)
-
-            # Format the date for display
-            display_df['Submission Date'] = pd.to_datetime(display_df['Submission Date']).dt.strftime('%Y-%m-%d')
-
-            st.dataframe(
-                display_df,
+        with tab1:
+            st.plotly_chart(
+                create_salary_distribution(df),
                 use_container_width=True,
-                hide_index=True
+                config={'responsive': True}
             )
-            st.markdown('</div>', unsafe_allow_html=True)
-        else:
-            st.info("No data available for this country yet. Be the first to contribute!")
+
+        with tab2:
+            st.plotly_chart(
+                create_experience_salary_correlation(df),
+                use_container_width=True,
+                config={'responsive': True}
+            )
+
+        with tab3:
+            st.plotly_chart(
+                create_industry_salary_box(df),
+                use_container_width=True,
+                config={'responsive': True}
+            )
+
+        with tab4:
+            st.plotly_chart(
+                create_degree_distribution(df),
+                use_container_width=True,
+                config={'responsive': True}
+            )
+
+        with tab5:
+            st.plotly_chart(
+                create_top_roles_salary(df),
+                use_container_width=True,
+                config={'responsive': True}
+            )
+
+        # Data table with horizontal scroll on mobile
+        st.subheader("Detailed Data")
+        st.markdown('<div class="table-container">', unsafe_allow_html=True)
+        display_df = df[[
+            'Role', 'Monthly Gross Salary (in ZMW)',
+            'Salary Gross in USD', 'Years of Experience',
+            'Industry', 'Company location (Country)',
+            'Submission Date'
+        ]].sort_values('Submission Date', ascending=False)
+
+        # Format the date for display
+        display_df['Submission Date'] = pd.to_datetime(display_df['Submission Date']).dt.strftime('%Y-%m-%d')
+
+        st.dataframe(
+            display_df,
+            use_container_width=True,
+            hide_index=True
+        )
+        st.markdown('</div>', unsafe_allow_html=True)
     else:
         st.info("No salary data available yet. Be the first to contribute!")
 
     # Mobile-friendly submission form
     with st.expander("Submit Your Salary Data", expanded=False):
         submission_form(save_submission)
+
+    # Load data: combined and preloaded-only (preloaded rows will show Submission Date = 2022-01-01)
+    combined_df = load_data()
+    preloaded_df = load_preloaded_data()
+
+    st.sidebar.markdown("## Data")
+    if st.sidebar.checkbox("Show preloaded data (salary_data.csv)"):
+        st.sidebar.write(f"Preloaded rows: {len(preloaded_df)} — Submission Date set to 2022-01-01")
+        st.dataframe(preloaded_df)
+
+    if st.sidebar.checkbox("Show new submissions (new_salary.csv)"):
+        # show only new entries
+        from utils.data_handler import NEW_CSV
+        new_df = combined_df.loc[combined_df["Submission Date"] != pd.to_datetime("2022-01-01")]
+        st.sidebar.write(f"New submission rows: {len(new_df)}")
+        st.dataframe(new_df)
+
+    if st.sidebar.checkbox("Show combined data"):
+        st.sidebar.write(f"Total rows: {len(combined_df)}")
+        st.dataframe(combined_df)
 
 if __name__ == "__main__":
     #os.system('taskkill /F /IM streamlit.exe')
