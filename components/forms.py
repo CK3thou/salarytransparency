@@ -194,7 +194,7 @@ def submission_form(save_callback):
 
             if save_callback(data):
                 st.success("Thank you for your submission!")
-                st.experimental_rerun()
+                st.rerun()
                 return True
             else:
                 st.error("An error occurred while saving your submission.")

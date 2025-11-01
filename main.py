@@ -43,15 +43,11 @@ def main():
         # Import locally to avoid import-time side effects when not available
         from streamlit.runtime.scriptrunner import get_script_run_ctx
         ctx = get_script_run_ctx()
-    except Exception:
+    except Exception as e:
+        # If we can't get context, still try to run the app
+        # This allows the app to work even if context detection fails
         ctx = None
-
-    if ctx is None:
-        # Running in bare mode / direct python execution
-        print("This is a Streamlit app. To run it in a browser, use:")
-        print("    streamlit run c:/Users/justthatuser/Documents/GitHub/salarytransparency/main.py")
-        print("Session state and other Streamlit runtime features are unavailable when running with `python`.")
-        return
+        st.warning(f"Note: Script context detection failed: {e}. App may have limited functionality.")
     # PWA Setup
     st.markdown("""
         <link rel="manifest" href="static/manifest.json">
@@ -102,22 +98,7 @@ def main():
             body {
                 -webkit-tap-highlight-color: transparent;
                 -webkit-touch-callout: none;
-                -webkit-user-select: none;                cd /workspaces/salarytransparency
-                
-                # stage all changes and commit (no-op if nothing to commit)
-                git add -A
-                git commit -m "Save workspace changes" || echo "No changes to commit"
-                
-                # show resulting repo state
-                git status --porcelain -b
-                ```cd /workspaces/salarytransparency
-                
-                # stage all changes and commit (no-op if nothing to commit)
-                git add -A
-                git commit -m "Save workspace changes" || echo "No changes to commit"
-                
-                # show resulting repo state
-                git status --porcelain -b
+                -webkit-user-select: none;
                 user-select: none;
             }
             /* Smooth scrolling */
@@ -130,10 +111,18 @@ def main():
 
     st.title("Salary Transparency Platform")
 
-    # Load data with debug information
-    st.write("Loading data...")
-    df = load_data()
-    st.write(f"Data loaded with {len(df)} rows")
+    # Load data with error handling
+    try:
+        with st.spinner("Loading data..."):
+            df = load_data()
+        if df.empty:
+            st.info("No salary data available yet. Be the first to contribute!")
+        else:
+            st.success(f"Data loaded successfully: {len(df)} rows")
+    except Exception as e:
+        st.error(f"Error loading data: {str(e)}")
+        st.exception(e)
+        df = pd.DataFrame()
 
     # Main content
     st.subheader("Submissions")
@@ -158,59 +147,71 @@ def main():
         ])
 
         with tab1:
-            st.plotly_chart(
-                create_salary_distribution(df),
-                use_container_width=True,
-                config={'responsive': True}
-            )
+            try:
+                fig = create_salary_distribution(df)
+                st.plotly_chart(fig, use_container_width=True, config={'responsive': True})
+            except Exception as e:
+                st.error(f"Error creating salary distribution chart: {str(e)}")
 
         with tab2:
-            st.plotly_chart(
-                create_experience_salary_correlation(df),
-                use_container_width=True,
-                config={'responsive': True}
-            )
+            try:
+                fig = create_experience_salary_correlation(df)
+                st.plotly_chart(fig, use_container_width=True, config={'responsive': True})
+            except Exception as e:
+                st.error(f"Error creating experience correlation chart: {str(e)}")
 
         with tab3:
-            st.plotly_chart(
-                create_industry_salary_box(df),
-                use_container_width=True,
-                config={'responsive': True}
-            )
+            try:
+                fig = create_industry_salary_box(df)
+                st.plotly_chart(fig, use_container_width=True, config={'responsive': True})
+            except Exception as e:
+                st.error(f"Error creating industry analysis chart: {str(e)}")
 
         with tab4:
-            st.plotly_chart(
-                create_degree_distribution(df),
-                use_container_width=True,
-                config={'responsive': True}
-            )
+            try:
+                fig = create_degree_distribution(df)
+                st.plotly_chart(fig, use_container_width=True, config={'responsive': True})
+            except Exception as e:
+                st.error(f"Error creating degree distribution chart: {str(e)}")
 
         with tab5:
-            st.plotly_chart(
-                create_top_roles_salary(df),
-                use_container_width=True,
-                config={'responsive': True}
-            )
+            try:
+                fig = create_top_roles_salary(df)
+                st.plotly_chart(fig, use_container_width=True, config={'responsive': True})
+            except Exception as e:
+                st.error(f"Error creating role analysis chart: {str(e)}")
 
         # Data table with horizontal scroll on mobile
         st.subheader("Detailed Data")
-        st.markdown('<div class="table-container">', unsafe_allow_html=True)
-        display_df = df[[
-            'Role', 'Monthly Gross Salary (in ZMW)',
-            'Salary Gross in USD', 'Years of Experience',
-            'Industry', 'Company location (Country)',
-            'Submission Date'
-        ]].sort_values('Submission Date', ascending=False)
-
-        # Format the date for display
-        display_df['Submission Date'] = pd.to_datetime(display_df['Submission Date']).dt.strftime('%Y-%m-%d')
-
-        st.dataframe(
-            display_df,
-            use_container_width=True,
-            hide_index=True
-        )
-        st.markdown('</div>', unsafe_allow_html=True)
+        try:
+            st.markdown('<div class="table-container">', unsafe_allow_html=True)
+            # Check which columns are available
+            available_cols = ['Role', 'Monthly Gross Salary (in ZMW)',
+                            'Salary Gross in USD', 'Years of Experience',
+                            'Industry', 'Company location (Country)',
+                            'Submission Date']
+            display_cols = [col for col in available_cols if col in df.columns]
+            
+            if display_cols:
+                display_df = df[display_cols].copy()
+                
+                # Sort by Submission Date if available
+                if 'Submission Date' in display_df.columns:
+                    display_df = display_df.sort_values('Submission Date', ascending=False)
+                    # Format the date for display
+                    display_df['Submission Date'] = pd.to_datetime(display_df['Submission Date'], errors='coerce').dt.strftime('%Y-%m-%d')
+                
+                st.dataframe(
+                    display_df,
+                    use_container_width=True,
+                    hide_index=True
+                )
+            else:
+                st.warning("No displayable columns found in the data.")
+            st.markdown('</div>', unsafe_allow_html=True)
+        except Exception as e:
+            st.error(f"Error displaying data table: {str(e)}")
+            st.exception(e)
     else:
         st.info("No salary data available yet. Be the first to contribute!")
 
