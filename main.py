@@ -16,6 +16,8 @@ if __name__ == "__main__":
 
 import streamlit as st
 import pandas as pd
+import plotly.express as px
+import plotly.graph_objects as go
 from utils.data_handler import load_data, save_submission, load_preloaded_data
 from utils.visualizations import (
     create_salary_distribution, create_experience_salary_correlation,
@@ -34,6 +36,9 @@ st.set_page_config(
 )
 
 def main():
+    st.title("Salary Transparency")
+    st.subheader("Exploring salary data across industries and locations")
+
     # Detect whether the app is being run via `streamlit run` (script run context).
     # When running the script directly with `python main.py`, Streamlit's
     # ScriptRunContext is not available and features like session state
@@ -102,22 +107,7 @@ def main():
             body {
                 -webkit-tap-highlight-color: transparent;
                 -webkit-touch-callout: none;
-                -webkit-user-select: none;                cd /workspaces/salarytransparency
-                
-                # stage all changes and commit (no-op if nothing to commit)
-                git add -A
-                git commit -m "Save workspace changes" || echo "No changes to commit"
-                
-                # show resulting repo state
-                git status --porcelain -b
-                ```cd /workspaces/salarytransparency
-                
-                # stage all changes and commit (no-op if nothing to commit)
-                git add -A
-                git commit -m "Save workspace changes" || echo "No changes to commit"
-                
-                # show resulting repo state
-                git status --porcelain -b
+                -webkit-user-select: none;
                 user-select: none;
             }
             /* Smooth scrolling */
@@ -127,8 +117,6 @@ def main():
             }
         </style>
     """, unsafe_allow_html=True)
-
-    st.title("Salary Transparency Platform")
 
     # Load data with debug information
     st.write("Loading data...")
