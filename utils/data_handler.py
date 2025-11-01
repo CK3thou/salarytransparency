@@ -83,9 +83,6 @@ else:
 # Get the project root directory (parent of utils directory)
 _project_root = Path(__file__).parent.parent
 
-# Original preloaded CSV (read-only source of initial data)
-DATA_CSV = _project_root / "data" / "salary_data.csv"
-
 # New CSV file that will be the primary storage for all new submissions
 NEW_CSV = _project_root / "data" / "new_salary.csv"
 
@@ -226,52 +223,31 @@ def _read_csv_safe(path: Path) -> pd.DataFrame:
     except Exception:
         return pd.DataFrame(columns=CANONICAL_COLUMNS)
 
-def load_preloaded_data() -> pd.DataFrame:
-    """
-    Return the preloaded data (from DATA_CSV) with Submission Date set to 2022-01-01
-    so preloaded rows show the requested fixed submission date.
-    """
-    base = _read_csv_safe(DATA_CSV)
-    if base.empty:
-        return pd.DataFrame(columns=CANONICAL_COLUMNS)
-    # set Submission Date to 2022-01-01 for all preloaded rows
-    base["Submission Date"] = pd.to_datetime("2022-01-01")
-    # ensure compatibility column name expected elsewhere
-    if "Company location" in base.columns and "Company location (Country)" not in base.columns:
-        base["Company location (Country)"] = base["Company location"]
-    return base
-
 def load_data() -> pd.DataFrame:
     """
-    Load preloaded data (salary_data.csv) and any new submissions (new_salary.csv),
-    concatenate them and return a single DataFrame the app will use.
-    Also ensures preloaded rows have Submission Date = 2022-01-01 so the UI can
-    easily distinguish them from new submissions.
+    Load all data from the single source of truth (new_salary.csv) and return a
+    normalized DataFrame.
     """
     # ensure new file exists (header) so save_submission can append later
     _ensure_csv_exists(NEW_CSV)
-
-    # Use the helper that normalizes preloaded dates to 2022-01-01
-    base_df = load_preloaded_data()
-    new_df = _read_csv_safe(NEW_CSV)
-
-    if base_df.empty and new_df.empty:
+    df = _read_csv_safe(NEW_CSV)
+    if df.empty:
         return pd.DataFrame(columns=CANONICAL_COLUMNS)
-
-    combined = pd.concat([base_df, new_df], ignore_index=True, sort=False)
     # keep canonical columns and compatibility name expected by filters
-    if "Company location" in combined.columns and "Company location (Country)" not in combined.columns:
-        combined["Company location (Country)"] = combined["Company location"]
-    return combined
+    if "Company location" in df.columns and "Company location (Country)" not in df.columns:
+        df["Company location (Country)"] = df["Company location"]
+    return df
 
 def save_submission(record: dict):
     """
     Append a single submission to NEW_CSV. This file is the primary storage for new entries.
     Uses an exclusive file lock to avoid concurrent write corruption.
+    Returns True on success, False on failure.
     """
-    _ensure_csv_exists(NEW_CSV)
+    try:
+        _ensure_csv_exists(NEW_CSV)
 
-    mapping_preferences = {
+        mapping_preferences = {
         "Role": ["Role", "role"],
         "Company location": ["Company location", "company_location", "Company location (Country)"],
         "Monthly Gross Salary (in ZMW)": ["Monthly Gross Salary (in ZMW)", "Monthly Gross Salary ZMW", "monthly_gross_salary_zmw"],
@@ -284,34 +260,54 @@ def save_submission(record: dict):
         "Industry": ["Industry", "industry"],
         "Submission Date": ["Submission Date", "submission_date"],
         "Real-time USD ZMW exchange rate": ["Real-time USD ZMW exchange rate", "realtime_usd_zmw_rate"]
-    }
+        }
 
-    row = {}
-    for canonical, keys in mapping_preferences.items():
-        val = None
-        for k in keys:
-            if k in record and record.get(k) not in (None, ""):
-                val = record.get(k)
-                break
-        if canonical == "Submission Date" and not val:
-            val = datetime.utcnow().isoformat(sep=" ")
-        row[canonical] = "" if val is None else val
+        # Build a canonical row
+        row = {}
+        for canonical, keys in mapping_preferences.items():
+            val = None
+            for k in keys:
+                if k in record and record.get(k) not in (None, ""):
+                    val = record.get(k)
+                    break
+            # Default timestamp if missing
+            if canonical == "Submission Date" and not val:
+                val = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
 
-    # append to NEW_CSV with file lock
-    with _lock:
-        with open(NEW_CSV, "a+", newline="", encoding="utf-8") as f:
-            try:
-                lock_file(f)
-                f.seek(0)
-                content = f.read(1)
-                writer = csv.DictWriter(f, fieldnames=CANONICAL_COLUMNS)
-                if not content:
+            # Normalize scalars to strings for CSV
+            if canonical in ("Monthly Gross Salary (in ZMW)", "Salary Gross in USD", "Years of Experience") and val not in (None, ""):
+                try:
+                    # keep numeric but ensure no thousands separators, then cast back to string for CSV
+                    num = float(val)
+                    if canonical == "Years of Experience":
+                        num = int(num)
+                    val = str(num)
+                except Exception:
+                    # leave as-is; downstream reader will coerce
+                    pass
+
+            row[canonical] = "" if val is None else val
+
+        # append to NEW_CSV with file lock
+        with _lock:
+            with open(NEW_CSV, "a+", newline="", encoding="utf-8") as f:
+                try:
+                    lock_file(f)
                     f.seek(0)
-                    writer.writeheader()
-                f.seek(0, 2)
-                writer.writerow(row)
-            finally:
-                unlock_file(f)
+                    content = f.read(1)
+                    writer = csv.DictWriter(f, fieldnames=CANONICAL_COLUMNS)
+                    if not content:
+                        f.seek(0)
+                        writer.writeheader()
+                    f.seek(0, 2)
+                    writer.writerow(row)
+                finally:
+                    unlock_file(f)
+        return True
+    except Exception as e:
+        # Basic logging to console; Streamlit will also show error upstream
+        print(f"Error saving submission: {e}")
+        return False
 
 
 def get_locations() -> list:

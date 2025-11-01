@@ -3,7 +3,7 @@ import sys
 
 import streamlit as st
 import pandas as pd
-from utils.data_handler import load_data, save_submission, load_preloaded_data
+from utils.data_handler import load_data, save_submission
 from utils.visualizations import (
     create_salary_distribution, create_experience_salary_correlation,
     create_industry_salary_box, create_degree_distribution,
@@ -125,6 +125,29 @@ def main():
             st.info("No salary data available yet. Be the first to contribute!")
         else:
             st.success(f"Data loaded successfully: {len(df)} rows")
+            # If a recent submission exists from the form, show a toast and a compact preview
+            if "recent_submission" in st.session_state:
+                recent = st.session_state.pop("recent_submission", None)
+                if recent:
+                    try:
+                        role = recent.get("Role", "")
+                        loc = recent.get("Company location (Country)", recent.get("Company location", ""))
+                        zmw = recent.get("Monthly Gross Salary (in ZMW)")
+                        zmw_txt = f"{float(zmw):,.2f}" if zmw not in (None, "") else "-"
+                        st.toast(f"Added submission: {role} — ZMW {zmw_txt} ({loc})", icon="✅")
+                        with st.expander("Recently added (just now)", expanded=False):
+                            recent_view = {
+                                "Role": role,
+                                "Company location (Country)": loc,
+                                "Monthly Gross Salary (in ZMW)": zmw,
+                                "Salary Gross in USD": recent.get("Salary Gross in USD", ""),
+                                "Years of Experience": recent.get("Years of Experience", ""),
+                                "Industry": recent.get("Industry", ""),
+                            }
+                            st.dataframe(pd.DataFrame([recent_view]), use_container_width=True, hide_index=True)
+                    except Exception:
+                        # Non-fatal; continue rendering the page
+                        pass
     except Exception as e:
         st.error(f"Error loading data: {str(e)}")
         st.exception(e)
@@ -225,10 +248,7 @@ def main():
     with st.expander("Submit Your Salary Data", expanded=False):
         submission_form(save_submission)
 
-    # Load data: combined and preloaded-only (preloaded rows will show Submission Date = 2022-01-01)
-    combined_df = load_data()
-    preloaded_df = load_preloaded_data()
-
+    # Sidebar utilities and data preview (new_salary.csv only)
     st.sidebar.markdown("## Data")
     # Admin utility: backfill missing submission dates in new submissions file
     try:
@@ -238,20 +258,9 @@ def main():
             st.sidebar.success(f"Backfilled {updated} rows.")
     except Exception as _e:
         st.sidebar.caption("Backfill utility unavailable.")
-    if st.sidebar.checkbox("Show preloaded data (salary_data.csv)"):
-        st.sidebar.write(f"Preloaded rows: {len(preloaded_df)} — Submission Date set to 2022-01-01")
-        st.dataframe(preloaded_df)
-
-    if st.sidebar.checkbox("Show new submissions (new_salary.csv)"):
-        # show only new entries
-        from utils.data_handler import NEW_CSV
-        new_df = combined_df.loc[combined_df["Submission Date"] != pd.to_datetime("2022-01-01")]
-        st.sidebar.write(f"New submission rows: {len(new_df)}")
-        st.dataframe(new_df)
-
-    if st.sidebar.checkbox("Show combined data"):
-        st.sidebar.write(f"Total rows: {len(combined_df)}")
-        st.dataframe(combined_df)
+    if st.sidebar.checkbox("Show all data (new_salary.csv)"):
+        st.sidebar.write(f"Total rows: {len(df)}")
+        st.dataframe(df)
 
 if __name__ == "__main__":
     #os.system('taskkill /F /IM streamlit.exe')

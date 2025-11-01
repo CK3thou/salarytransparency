@@ -22,15 +22,15 @@ main.py                 # App entry point & UI layout
 │   ├── data_handler.py    # Data loading/saving
 │   └── visualizations.py  # Plotly chart generation
 ├── data/              # Data storage
-│   └── salary_data.csv    # Primary dataset
+│   └── new_salary.csv     # Primary dataset (all reads/writes)
 └── static/            # PWA assets
     ├── manifest.json
     └── sw.js
 ```
 
 Data flow:
-1. `data_handler.py` loads salary data from CSV/Excel
-2. User inputs via `forms.py` are validated and saved
+1. `data_handler.py` loads salary data exclusively from `data/new_salary.csv`
+2. User inputs via `forms.py` are validated and appended to `data/new_salary.csv`
 3. `visualizations.py` transforms data into Plotly charts
 4. `main.py` orchestrates components and manages layout
 
@@ -50,8 +50,8 @@ Note: Running `python main.py` directly will show an error message - the app req
 
 ### Data Handling Patterns
 
-- Salary data is stored in both CSV and Excel formats for redundancy
-- New submissions are appended to existing data
+- Single source of truth: `data/new_salary.csv`
+- New submissions are appended to `data/new_salary.csv`
 - Currency conversion (ZMW ↔ USD) uses forex-python (gracefully degrades if unavailable)
 - Data cleaning normalizes column names and handles missing values
 
@@ -91,7 +91,6 @@ df['Years of Experience'] = df['Years of Experience'].str.extract(r'(\d+)', expa
 ## Common Pitfalls
 
 1. Don't run `python main.py` directly - use `streamlit run`
-2. Don't modify column names in `salary_data.csv` - they're hardcoded in transforms
-3. Remember to handle both CSV and Excel data sources
-4. Test mobile layouts - the app is mobile-first
-5. Wrap Streamlit-specific code in runtime checks
+2. Don't modify column names in `new_salary.csv` - they're assumed in transforms
+3. Test mobile layouts - the app is mobile-first
+4. Wrap Streamlit-specific code in runtime checks

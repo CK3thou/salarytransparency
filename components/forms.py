@@ -188,7 +188,10 @@ def submission_form(save_callback):
             }
 
             if save_callback(data):
+                # Store recent submission in session so main app can toast and highlight it
+                st.session_state["recent_submission"] = data
                 st.success("Thank you for your submission!")
+                # Rerun to refresh the main table immediately
                 st.rerun()
                 return True
             else:
