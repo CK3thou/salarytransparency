@@ -155,8 +155,7 @@ def submission_form(save_callback):
                 missing_fields.append("Company Location")
             if not salary_zmw:
                 missing_fields.append("Monthly Salary (ZMW)")
-            if experience is None or experience < 0:
-                missing_fields.append("Years of Experience")
+            # Experience has min_value=0 and value=0, so it's always valid (0 is acceptable)
             if not your_location:
                 missing_fields.append("Your Location")
             if not nationality:
