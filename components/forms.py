@@ -27,12 +27,7 @@ def get_exchange_rate():
 
 def submission_form(save_callback):
     """Render and handle the salary submission form"""
-
-    # Place this outside the form
-    if st.button("Get Current Exchange Rate"):
-        rate = get_exchange_rate()
-        if rate:
-            st.info(f"Current USD to ZMW rate: {rate:.2f}")
+    # Removed the standalone exchange rate button for a cleaner UI
 
     # Load location options for dropdowns (cached in data handler if desired)
     _locations = get_locations()

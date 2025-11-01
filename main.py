@@ -1,19 +1,6 @@
 import os
 import sys
 
-# If this script is invoked directly with `python main.py` (bare mode),
-# Streamlit's runtime isn't available and importing `streamlit` will
-# emit repeated "missing ScriptRunContext" warnings. Detect that case
-# early and print a helpful message before any Streamlit import.
-if __name__ == "__main__":
-    # Common Streamlit environment keys that are present when run via
-    # `streamlit run`. If none are found, assume bare python execution.
-    streamlit_keys = ("STREAMLIT_RUN_MAIN", "STREAMLIT_SERVER_PORT", "STREAMLIT_BROWSER_GZIP")
-    if not any(k in os.environ for k in streamlit_keys):
-        print("This is a Streamlit app. To run it in a browser, use:")
-        print("    streamlit run c:/Users/justthatuser/Documents/GitHub/salarytransparency/main.py")
-        sys.exit(0)
-
 import streamlit as st
 import pandas as pd
 from utils.data_handler import load_data, save_submission, load_preloaded_data
@@ -50,16 +37,18 @@ def main():
         st.warning(f"Note: Script context detection failed: {e}. App may have limited functionality.")
     # PWA Setup
     st.markdown("""
-        <link rel="manifest" href="static/manifest.json">
+        <link rel="manifest" href="./static/manifest.json">
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
         <meta name="theme-color" content="#0066cc">
         <meta name="apple-mobile-web-app-capable" content="yes">
         <meta name="apple-mobile-web-app-status-bar-style" content="black">
         <meta name="apple-mobile-web-app-title" content="SalaryApp">
-        <link rel="apple-touch-icon" href="static/icons/icon-192.png">
+        <link rel="apple-touch-icon" href="./static/icons/icon-192.png">
         <script>
             if ('serviceWorker' in navigator) {
                 window.addEventListener('load', () => {
-                    navigator.serviceWorker.register('/static/sw.js');
+                    navigator.serviceWorker.register('./static/sw.js', { scope: './' })
+                        .catch(err => console.warn('Service worker registration failed:', err));
                 });
             }
         </script>
@@ -101,6 +90,16 @@ def main():
                 -webkit-user-select: none;
                 user-select: none;
             }
+            /* Table container for mobile */
+            .table-container {
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+                margin: 1rem -1rem;
+                padding: 0 1rem;
+            }
+            /* Alert and exception tweaks */
+            .stAlert { border-radius: 8px; }
+            .stException { font-size: 0.9em; overflow-x: auto; white-space: pre-wrap; }
             /* Smooth scrolling */
             .main {
                 scroll-behavior: smooth;
@@ -113,6 +112,13 @@ def main():
 
     # Load data with error handling
     try:
+        # Backfill missing submission dates in new submissions file (one-time maintenance)
+        try:
+            from utils.data_handler import backfill_new_csv_submission_dates
+            backfill_new_csv_submission_dates()
+        except Exception:
+            pass
+
         with st.spinner("Loading data..."):
             df = load_data()
         if df.empty:
@@ -224,6 +230,14 @@ def main():
     preloaded_df = load_preloaded_data()
 
     st.sidebar.markdown("## Data")
+    # Admin utility: backfill missing submission dates in new submissions file
+    try:
+        if st.sidebar.button("Backfill missing submission dates (2023-08-03..2023-12-31)"):
+            from utils.data_handler import backfill_new_csv_submission_dates
+            updated = backfill_new_csv_submission_dates()
+            st.sidebar.success(f"Backfilled {updated} rows.")
+    except Exception as _e:
+        st.sidebar.caption("Backfill utility unavailable.")
     if st.sidebar.checkbox("Show preloaded data (salary_data.csv)"):
         st.sidebar.write(f"Preloaded rows: {len(preloaded_df)} — Submission Date set to 2022-01-01")
         st.dataframe(preloaded_df)
