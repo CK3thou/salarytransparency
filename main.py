@@ -50,16 +50,18 @@ def main():
         st.warning(f"Note: Script context detection failed: {e}. App may have limited functionality.")
     # PWA Setup
     st.markdown("""
-        <link rel="manifest" href="static/manifest.json">
+        <link rel="manifest" href="./static/manifest.json">
         <meta name="theme-color" content="#0066cc">
         <meta name="apple-mobile-web-app-capable" content="yes">
         <meta name="apple-mobile-web-app-status-bar-style" content="black">
         <meta name="apple-mobile-web-app-title" content="SalaryApp">
-        <link rel="apple-touch-icon" href="static/icons/icon-192.png">
+        <link rel="apple-touch-icon" href="./static/icons/icon-192.png">
         <script>
             if ('serviceWorker' in navigator) {
                 window.addEventListener('load', () => {
-                    navigator.serviceWorker.register('/static/sw.js');
+                    navigator.serviceWorker.register('./static/sw.js', {scope: './'}).catch(err => {
+                        console.warn('Service worker registration failed:', err);
+                    });
                 });
             }
         </script>
@@ -100,6 +102,23 @@ def main():
                 -webkit-touch-callout: none;
                 -webkit-user-select: none;
                 user-select: none;
+            }
+            /* Table container for mobile */
+            .table-container {
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+                margin: 1rem -1rem;
+                padding: 0 1rem;
+            }
+            /* Error and warning styles */
+            .stAlert {
+                border-radius: 8px;
+                margin: 1rem 0;
+            }
+            .stException {
+                font-size: 0.9em;
+                overflow-x: auto;
+                white-space: pre-wrap;
             }
             /* Smooth scrolling */
             .main {
