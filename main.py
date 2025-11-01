@@ -168,50 +168,8 @@ def main():
             unique_roles = len(df['Role'].unique())
             st.metric("Unique Roles", unique_roles)
 
-        # Create tabs for different visualizations
-        tab1, tab2, tab3, tab4, tab5 = st.tabs([
-            "Salary Distribution", "Experience Impact",
-            "Industry Analysis", "Education Impact",
-            "Role Analysis"
-        ])
-
-        with tab1:
-            try:
-                fig = create_salary_distribution(df)
-                st.plotly_chart(fig, use_container_width=True, config={'responsive': True})
-            except Exception as e:
-                st.error(f"Error creating salary distribution chart: {str(e)}")
-
-        with tab2:
-            try:
-                fig = create_experience_salary_correlation(df)
-                st.plotly_chart(fig, use_container_width=True, config={'responsive': True})
-            except Exception as e:
-                st.error(f"Error creating experience correlation chart: {str(e)}")
-
-        with tab3:
-            try:
-                fig = create_industry_salary_box(df)
-                st.plotly_chart(fig, use_container_width=True, config={'responsive': True})
-            except Exception as e:
-                st.error(f"Error creating industry analysis chart: {str(e)}")
-
-        with tab4:
-            try:
-                fig = create_degree_distribution(df)
-                st.plotly_chart(fig, use_container_width=True, config={'responsive': True})
-            except Exception as e:
-                st.error(f"Error creating degree distribution chart: {str(e)}")
-
-        with tab5:
-            try:
-                fig = create_top_roles_salary(df)
-                st.plotly_chart(fig, use_container_width=True, config={'responsive': True})
-            except Exception as e:
-                st.error(f"Error creating role analysis chart: {str(e)}")
-
-        # Data table with horizontal scroll on mobile
-        st.subheader("Detailed Data")
+        # Data table with horizontal scroll on mobile (all data from new_salary.csv)
+        st.subheader("All Data")
         try:
             st.markdown('<div class="table-container">', unsafe_allow_html=True)
             # Check which columns are available
@@ -241,6 +199,43 @@ def main():
         except Exception as e:
             st.error(f"Error displaying data table: {str(e)}")
             st.exception(e)
+
+        # Recommended visualizations (rendered below the table)
+        st.subheader("Visualizations")
+        try:
+            st.markdown("### Salary Distribution")
+            fig = create_salary_distribution(df)
+            st.plotly_chart(fig, use_container_width=True, config={'responsive': True})
+        except Exception as e:
+            st.error(f"Error creating salary distribution chart: {str(e)}")
+
+        try:
+            st.markdown("### Experience vs Salary")
+            fig = create_experience_salary_correlation(df)
+            st.plotly_chart(fig, use_container_width=True, config={'responsive': True})
+        except Exception as e:
+            st.error(f"Error creating experience correlation chart: {str(e)}")
+
+        try:
+            st.markdown("### Industry Salary Spread")
+            fig = create_industry_salary_box(df)
+            st.plotly_chart(fig, use_container_width=True, config={'responsive': True})
+        except Exception as e:
+            st.error(f"Error creating industry analysis chart: {str(e)}")
+
+        try:
+            st.markdown("### Salary by Degree")
+            fig = create_degree_distribution(df)
+            st.plotly_chart(fig, use_container_width=True, config={'responsive': True})
+        except Exception as e:
+            st.error(f"Error creating degree distribution chart: {str(e)}")
+
+        try:
+            st.markdown("### Top Roles by Salary")
+            fig = create_top_roles_salary(df)
+            st.plotly_chart(fig, use_container_width=True, config={'responsive': True})
+        except Exception as e:
+            st.error(f"Error creating role analysis chart: {str(e)}")
     else:
         st.info("No salary data available yet. Be the first to contribute!")
 
@@ -248,19 +243,7 @@ def main():
     with st.expander("Submit Your Salary Data", expanded=False):
         submission_form(save_submission)
 
-    # Sidebar utilities and data preview (new_salary.csv only)
-    st.sidebar.markdown("## Data")
-    # Admin utility: backfill missing submission dates in new submissions file
-    try:
-        if st.sidebar.button("Backfill missing submission dates (2023-08-03..2023-12-31)"):
-            from utils.data_handler import backfill_new_csv_submission_dates
-            updated = backfill_new_csv_submission_dates()
-            st.sidebar.success(f"Backfilled {updated} rows.")
-    except Exception as _e:
-        st.sidebar.caption("Backfill utility unavailable.")
-    if st.sidebar.checkbox("Show all data (new_salary.csv)"):
-        st.sidebar.write(f"Total rows: {len(df)}")
-        st.dataframe(df)
+    # Sidebar removed per request
 
 if __name__ == "__main__":
     #os.system('taskkill /F /IM streamlit.exe')
