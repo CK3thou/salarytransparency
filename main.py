@@ -110,6 +110,19 @@ def main():
 
     st.title("Salary Transparency Platform")
 
+    @st.cache_data(show_spinner=False)
+    def load_currency_map():
+        """Load mapping of Location -> Currency Code from data/worldcities.csv."""
+        try:
+            path = os.path.join('data', 'worldcities.csv')
+            wdf = pd.read_csv(path, dtype=str)
+            wdf = wdf[['Location', 'Currency Code']].dropna()
+            wdf['Location'] = wdf['Location'].astype(str).str.strip().str.lower()
+            wdf = wdf.drop_duplicates(subset=['Location'])
+            return dict(zip(wdf['Location'], wdf['Currency Code']))
+        except Exception:
+            return {}
+
     # Load data with error handling
     try:
         # Backfill missing submission dates in new submissions file (one-time maintenance)
@@ -125,6 +138,23 @@ def main():
             st.info("No salary data available yet. Be the first to contribute!")
         else:
             st.success(f"Data loaded successfully: {len(df)} rows")
+            # Derive a Currency Code column based on user's location selections
+            try:
+                currency_lookup = load_currency_map()
+                if currency_lookup:
+                    candidates = []
+                    for col in ['Your Country/ Location', 'Company location (Country)', 'Company location']:
+                        if col in df.columns:
+                            s = df[col].astype(str).str.strip().str.lower().map(currency_lookup)
+                            candidates.append(s)
+                    if candidates:
+                        currency_code = candidates[0].copy()
+                        for s in candidates[1:]:
+                            currency_code = currency_code.fillna(s)
+                        df['Currency Code'] = currency_code.fillna('')
+            except Exception:
+                # Non-fatal if currency map fails
+                pass
             # If a recent submission exists from the form, show a toast and a compact preview
             if "recent_submission" in st.session_state:
                 recent = st.session_state.pop("recent_submission", None)
@@ -132,19 +162,23 @@ def main():
                     try:
                         role = recent.get("Role", "")
                         loc = recent.get("Company location (Country)", recent.get("Company location", ""))
-                        zmw = recent.get("Monthly Gross Salary (in ZMW)")
+                        zmw = recent.get("Monthly Gross Salary")
                         zmw_txt = f"{float(zmw):,.2f}" if zmw not in (None, "") else "-"
-                        st.toast(f"Added submission: {role} — ZMW {zmw_txt} ({loc})", icon="✅")
+                        st.toast(f"Added submission: {role} — {zmw_txt} ({loc})", icon="✅")
                         with st.expander("Recently added (just now)", expanded=False):
+                            # Compute currency code for the recent preview (best-effort)
+                            currency_lookup = load_currency_map()
+                            recent_loc = (recent.get('Your Country/ Location') or loc or '').strip().lower()
+                            recent_ccy = currency_lookup.get(recent_loc, '') if currency_lookup else ''
                             recent_view = {
                                 "Role": role,
                                 "Company location (Country)": loc,
-                                "Monthly Gross Salary (in ZMW)": zmw,
-                                "Salary Gross in USD": recent.get("Salary Gross in USD", ""),
+                                "Currency Code": recent_ccy,
+                                "Monthly Gross Salary": zmw,
                                 "Years of Experience": recent.get("Years of Experience", ""),
                                 "Industry": recent.get("Industry", ""),
                             }
-                            st.dataframe(pd.DataFrame([recent_view]), use_container_width=True, hide_index=True)
+                            st.dataframe(pd.DataFrame([recent_view]), width='stretch', hide_index=True)
                     except Exception:
                         # Non-fatal; continue rendering the page
                         pass
@@ -163,9 +197,9 @@ def main():
             st.metric("Total Entries", len(df))
         with metrics[1]:
             # Be robust: coerce to numeric in case upstream fallback left strings
-            s = pd.to_numeric(df.get('Monthly Gross Salary (in ZMW)'), errors='coerce')
+            s = pd.to_numeric(df.get('Monthly Gross Salary'), errors='coerce')
             avg_salary = float(s.mean()) if s is not None and len(s) else 0.0
-            st.metric("Average Salary (ZMW)", f"{avg_salary:,.2f}")
+            st.metric("Average Salary", f"{avg_salary:,.2f}")
         with metrics[2]:
             unique_roles = len(df['Role'].unique())
             st.metric("Unique Roles", unique_roles)
@@ -174,25 +208,32 @@ def main():
         st.subheader("All Data")
         try:
             st.markdown('<div class="table-container">', unsafe_allow_html=True)
-            # Check which columns are available
-            available_cols = ['Role', 'Monthly Gross Salary (in ZMW)',
-                            'Salary Gross in USD', 'Years of Experience',
-                            'Industry', 'Company location (Country)',
-                            'Submission Date']
-            display_cols = [col for col in available_cols if col in df.columns]
-            
+            # Build display DataFrame and ensure Currency Code is inserted before Monthly Gross Salary
+            display_df = df.copy()
+            if 'Currency Code' not in display_df.columns:
+                # Ensure column exists (may be empty if mapping failed)
+                display_df['Currency Code'] = ''
+
+            # Desired display order (will filter by availability)
+            desired_order = ['Role', 'Currency Code', 'Monthly Gross Salary',
+                             'Years of Experience', 'Industry', 'Company location (Country)',
+                             'Submission Date']
+            display_cols = [c for c in desired_order if c in display_df.columns]
+
             if display_cols:
-                display_df = df[display_cols].copy()
+                display_df = display_df[display_cols].copy()
                 
                 # Sort by Submission Date if available
                 if 'Submission Date' in display_df.columns:
                     display_df = display_df.sort_values('Submission Date', ascending=False)
-                    # Format the date for display
-                    display_df['Submission Date'] = pd.to_datetime(display_df['Submission Date'], errors='coerce').dt.strftime('%Y-%m-%d')
+                    # Format the date for display as dd/mm/YYYY
+                    display_df['Submission Date'] = pd.to_datetime(
+                        display_df['Submission Date'], errors='coerce', dayfirst=True
+                    ).dt.strftime('%d/%m/%Y')
                 
                 st.dataframe(
                     display_df,
-                    use_container_width=True,
+                    width='stretch',
                     hide_index=True
                 )
             else:
@@ -207,28 +248,28 @@ def main():
         try:
             st.markdown("### Salary Distribution")
             fig = create_salary_distribution(df)
-            st.plotly_chart(fig, use_container_width=True, config={'responsive': True})
+            st.plotly_chart(fig, width='stretch', config={'responsive': True})
         except Exception as e:
             st.error(f"Error creating salary distribution chart: {str(e)}")
 
         try:
             st.markdown("### Experience vs Salary")
             fig = create_experience_salary_correlation(df)
-            st.plotly_chart(fig, use_container_width=True, config={'responsive': True})
+            st.plotly_chart(fig, width='stretch', config={'responsive': True})
         except Exception as e:
             st.error(f"Error creating experience correlation chart: {str(e)}")
 
         try:
             st.markdown("### Industry Salary Spread")
             fig = create_industry_salary_box(df)
-            st.plotly_chart(fig, use_container_width=True, config={'responsive': True})
+            st.plotly_chart(fig, width='stretch', config={'responsive': True})
         except Exception as e:
             st.error(f"Error creating industry analysis chart: {str(e)}")
 
         try:
             st.markdown("### Salary by Degree")
             fig = create_degree_distribution(df)
-            st.plotly_chart(fig, use_container_width=True, config={'responsive': True})
+            st.plotly_chart(fig, width='stretch', config={'responsive': True})
         except Exception as e:
             st.error(f"Error creating degree distribution chart: {str(e)}")
 

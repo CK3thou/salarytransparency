@@ -52,7 +52,7 @@ def submission_form(save_callback):
             
             # Salary inputs with currency conversion
             salary_zmw = st.number_input(
-                "Monthly Salary (ZMW)*",
+                "Monthly Gross Salary*",
                 min_value=0.0,
                 step=100.0,
             )
@@ -161,7 +161,7 @@ def submission_form(save_callback):
             if not company_location:
                 missing_fields.append("Company Location")
             if not salary_zmw:
-                missing_fields.append("Monthly Salary (ZMW)")
+                missing_fields.append("Monthly Gross Salary")
             if not experience:
                 missing_fields.append("Years of Experience")
             if not your_location:
@@ -177,7 +177,7 @@ def submission_form(save_callback):
             data = {
                 'Role': role,
                 'Company location (Country)': company_location,
-                'Monthly Gross Salary (in ZMW)': salary_zmw,
+                'Monthly Gross Salary': salary_zmw,
                 'Salary Gross in USD': salary_usd if salary_usd > 0 else None,
                 'Years of Experience': experience,
                 'Degree': degree,

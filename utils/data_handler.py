@@ -93,7 +93,7 @@ WORLD_CITIES_CSV = _project_root / "data" / "worldcities.csv"
 CANONICAL_COLUMNS = [
     "Role",
     "Company location",
-    "Monthly Gross Salary (in ZMW)",
+    "Monthly Gross Salary",
     "Salary Gross in USD",
     "Years of Experience",
     "Degree",
@@ -117,9 +117,10 @@ def _ensure_csv_exists(path: Path):
 def _map_columns(df: pd.DataFrame) -> pd.DataFrame:
     col_map = {
         "Company location": "Company location",
-        "Company location (Country)": "Company location",
-        "Monthly Gross Salary ZMW": "Monthly Gross Salary (in ZMW)",
-        "Monthly Gross Salary (in ZMW)": "Monthly Gross Salary (in ZMW)",
+    "Monthly Gross Salary ZMW": "Monthly Gross Salary",
+    "Monthly Gross Salary (in ZMW)": "Monthly Gross Salary",
+    "Monthly Salary (ZMW)": "Monthly Gross Salary",
+    "Monthly Gross Salary": "Monthly Gross Salary",
         "Salary Gross in USD (leave blank if you get paid in ZMW)": "Salary Gross in USD",
         "Salary Gross in USD": "Salary Gross in USD",
         "Years of Experience": "Years of Experience",
@@ -151,6 +152,15 @@ def _map_columns(df: pd.DataFrame) -> pd.DataFrame:
     # If both exist but "Company location (Country)" is empty, fill from "Company location"
     if "Company location (Country)" in df.columns and "Company location" in df.columns:
         df["Company location (Country)"] = df["Company location (Country)"].replace("", pd.NA).fillna(df["Company location"])
+        # Ensure Company location canonical exists: if missing but (Country) exists, copy from it
+        if "Company location" not in df.columns and "Company location (Country)" in df.columns:
+            df["Company location"] = df["Company location (Country)"]
+        # Ensure compatibility column for display
+        if "Company location" in df.columns and "Company location (Country)" not in df.columns:
+            df["Company location (Country)"] = df["Company location"]
+        # If both exist but "Company location (Country)" is empty, fill from "Company location"
+        if "Company location (Country)" in df.columns and "Company location" in df.columns:
+            df["Company location (Country)"] = df["Company location (Country)"].replace("", pd.NA).fillna(df["Company location"])
     df = df[CANONICAL_COLUMNS]
     return df
 
@@ -201,7 +211,7 @@ def _read_csv_safe(path: Path) -> pd.DataFrame:
         if "Company location" in df.columns and "Company location (Country)" not in df.columns:
             df["Company location (Country)"] = df["Company location"]
         # normalize numeric fields
-        df["Monthly Gross Salary (in ZMW)"] = pd.to_numeric(df["Monthly Gross Salary (in ZMW)"], errors="coerce")
+        df["Monthly Gross Salary"] = pd.to_numeric(df["Monthly Gross Salary"], errors="coerce")
         df["Salary Gross in USD"] = pd.to_numeric(df["Salary Gross in USD"], errors="coerce")
         # parse submission date safely (treat day-first format for NEW_CSV)
         dayfirst = (path == NEW_CSV)
@@ -217,8 +227,10 @@ def _read_csv_safe(path: Path) -> pd.DataFrame:
         if path == NEW_CSV:
             try:
                 df_to_write = df.copy()
-                # Ensure dates are written as ISO yyyy-mm-dd
-                df_to_write["Submission Date"] = pd.to_datetime(df_to_write["Submission Date"], errors="coerce").dt.strftime("%Y-%m-%d")
+                # Ensure dates are written as day-first dd/mm/YYYY
+                df_to_write["Submission Date"] = pd.to_datetime(
+                    df_to_write["Submission Date"], errors="coerce", dayfirst=True
+                ).dt.strftime("%d/%m/%Y")
                 with _lock:
                     df_to_write.to_csv(path, index=False, encoding="utf-8")
             except Exception:
@@ -248,8 +260,8 @@ def _read_csv_safe(path: Path) -> pd.DataFrame:
                     "banking": "Banking",
                 }).str.title()
             # Numeric coercion
-            if "Monthly Gross Salary (in ZMW)" in fallback.columns:
-                fallback["Monthly Gross Salary (in ZMW)"] = pd.to_numeric(fallback["Monthly Gross Salary (in ZMW)"], errors="coerce")
+            if "Monthly Gross Salary" in fallback.columns:
+                fallback["Monthly Gross Salary"] = pd.to_numeric(fallback["Monthly Gross Salary"], errors="coerce")
             if "Salary Gross in USD" in fallback.columns:
                 fallback["Salary Gross in USD"] = pd.to_numeric(fallback["Salary Gross in USD"], errors="coerce")
             if "Years of Experience" in fallback.columns:
@@ -280,8 +292,8 @@ def load_data() -> pd.DataFrame:
             raw = pd.read_csv(NEW_CSV, dtype=str, keep_default_na=False)
             raw = _map_columns(raw)
             # minimal coercions for UI
-            if "Monthly Gross Salary (in ZMW)" in raw.columns:
-                raw["Monthly Gross Salary (in ZMW)"] = pd.to_numeric(raw["Monthly Gross Salary (in ZMW)"], errors="coerce")
+            if "Monthly Gross Salary" in raw.columns:
+                raw["Monthly Gross Salary"] = pd.to_numeric(raw["Monthly Gross Salary"], errors="coerce")
             if "Salary Gross in USD" in raw.columns:
                 raw["Salary Gross in USD"] = pd.to_numeric(raw["Salary Gross in USD"], errors="coerce")
             if "Submission Date" in raw.columns:
@@ -306,7 +318,11 @@ def save_submission(record: dict):
         mapping_preferences = {
         "Role": ["Role", "role"],
         "Company location": ["Company location", "company_location", "Company location (Country)"],
-        "Monthly Gross Salary (in ZMW)": ["Monthly Gross Salary (in ZMW)", "Monthly Gross Salary ZMW", "monthly_gross_salary_zmw"],
+        "Monthly Gross Salary": [
+            "Monthly Gross Salary",
+            "monthly_gross_salary_zmw",
+            "Monthly Salary (ZMW)"
+        ],
         "Salary Gross in USD": ["Salary Gross in USD", "Salary Gross in USD (leave blank if you get paid in ZMW)", "salary_gross_usd"],
         "Years of Experience": ["Years of Experience", "years_of_experience"],
         "Degree": ["Degree", "Degree (or not)", "degree"],
@@ -326,12 +342,20 @@ def save_submission(record: dict):
                 if k in record and record.get(k) not in (None, ""):
                     val = record.get(k)
                     break
-            # Default timestamp if missing
-            if canonical == "Submission Date" and not val:
-                val = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+            # Default date if missing (store as dd/mm/YYYY, no time)
+            if canonical == "Submission Date":
+                if not val:
+                    val = datetime.now().strftime("%d/%m/%Y")
+                else:
+                    # Coerce any provided value into dd/mm/YYYY
+                    try:
+                        val = pd.to_datetime(str(val), dayfirst=True, errors="coerce").strftime("%d/%m/%Y")
+                    except Exception:
+                        # If parsing fails, fall back to current date
+                        val = datetime.now().strftime("%d/%m/%Y")
 
             # Normalize scalars to strings for CSV
-            if canonical in ("Monthly Gross Salary (in ZMW)", "Salary Gross in USD", "Years of Experience") and val not in (None, ""):
+            if canonical in ("Monthly Gross Salary", "Salary Gross in USD", "Years of Experience") and val not in (None, ""):
                 try:
                     # keep numeric but ensure no thousands separators, then cast back to string for CSV
                     num = float(val)
@@ -399,7 +423,7 @@ def backfill_new_csv_submission_dates(
 ) -> int:
     """
     Backfill missing or blank 'Submission Date' values in NEW_CSV with random
-    ISO dates (YYYY-MM-DD) between the given inclusive date range.
+    dates formatted as dd/mm/YYYY between the given inclusive date range.
 
     Returns the number of rows updated.
     """
@@ -436,7 +460,7 @@ def backfill_new_csv_submission_dates(
     if mask.any():
         # Generate random dates for each missing row
         rand_days = [random.randint(0, total_days) for _ in range(mask.sum())]
-        rand_dates = [(start_dt + pd.Timedelta(days=d)).strftime("%Y-%m-%d") for d in rand_days]
+        rand_dates = [(start_dt + pd.Timedelta(days=d)).strftime("%d/%m/%Y") for d in rand_days]
         df.loc[mask, "Submission Date"] = rand_dates
         updated = int(mask.sum())
 

@@ -6,9 +6,9 @@ def create_salary_distribution(df):
     """Create salary distribution chart"""
     fig = px.histogram(
         df,
-        x='Monthly Gross Salary (in ZMW)',
+        x='Monthly Gross Salary',
         title='Salary Distribution',
-        labels={'Monthly Gross Salary (in ZMW)': 'Salary (ZMW)'},
+        labels={'Monthly Gross Salary': 'Salary'},
         opacity=0.7
     )
     fig.update_layout(
@@ -28,11 +28,11 @@ def create_experience_salary_correlation(df):
         fig = px.scatter(
             df,
             x='Years of Experience',
-            y='Monthly Gross Salary (in ZMW)',
+            y='Monthly Gross Salary',
             title='Experience vs Salary Correlation',
             labels={
                 'Years of Experience': 'Experience (Years)',
-                'Monthly Gross Salary (in ZMW)': 'Salary (ZMW)'
+                'Monthly Gross Salary': 'Salary'
             },
             trendline="lowess"  # Use lowess instead of ols, more robust
         )
@@ -41,11 +41,11 @@ def create_experience_salary_correlation(df):
         fig = px.scatter(
             df,
             x='Years of Experience',
-            y='Monthly Gross Salary (in ZMW)',
+            y='Monthly Gross Salary',
             title='Experience vs Salary Correlation',
             labels={
                 'Years of Experience': 'Experience (Years)',
-                'Monthly Gross Salary (in ZMW)': 'Salary (ZMW)'
+                'Monthly Gross Salary': 'Salary'
             }
         )
 
@@ -69,9 +69,9 @@ def create_industry_salary_box(df):
     fig = px.box(
         df_filtered,
         x='Industry',
-        y='Monthly Gross Salary (in ZMW)',
+        y='Monthly Gross Salary',
         title='Salary Ranges by Industry',
-        labels={'Monthly Gross Salary (in ZMW)': 'Salary (ZMW)'}
+        labels={'Monthly Gross Salary': 'Salary'}
     )
     fig.update_layout(
         height=500,
@@ -115,7 +115,7 @@ def create_degree_distribution(df):
 def create_top_roles_salary(df, top_n=10):
     """Create bar chart of average salaries by role"""
     # Calculate average salary by role
-    role_avg_salary = df.groupby('Role')['Monthly Gross Salary (in ZMW)'].agg(['mean', 'count'])
+    role_avg_salary = df.groupby('Role')['Monthly Gross Salary'].agg(['mean', 'count'])
     # Get top N roles by count
     top_roles = role_avg_salary.nlargest(top_n, 'count')
 
