@@ -1,48 +1,48 @@
 Role,Company location,Monthly Gross Salary,Salary Gross in USD,Years of Experience,Degree,Approx. No. of employees in company,Your Country/ Location,Nationality,Industry,Submission Date,Real-time USD ZMW exchange rate,Company location (Country)
-Finance Manager,"Lusaka, Zambia",40000,,15,Yes,150,"Lusaka, Zambia",Zambian,Events Services,01/11/2025,,"Lusaka, Zambia"
-Administration Officer,"Lusaka, Zambia",25000,,10,Yes,50,"Lusaka, Zambia",Zambian,Medical Practice,01/11/2025,,"Lusaka, Zambia"
-Japanese Animator,"Tokyo, Japan",30000,,3,No,,Zambia,Zambian,Animation,07/09/2023,,"Tokyo, Japan"
-Junior Network Engineer,"Kitwe, Zambia",11800,,0,Yes,1500,Zambia,Zambian,It,13/08/2023,,"Kitwe, Zambia"
-Engineer,"Kitwe, Zambia",27000,,5,Yes,,Zambia,Zambian,Energy,10/08/2023,,"Kitwe, Zambia"
-Accounts Assistant,"Kitwe, Zambia",6500,,1,Yes,,Zambia,Zambian,,05/10/2023,,"Kitwe, Zambia"
-Loan Officer,"Kitwe, Zambia",8000,,4,Yes,,,,Finance,14/08/2023,,"Kitwe, Zambia"
-Systems Administrator,"Lusaka, Zambia",17871,,7,Yes,,Zambia,Zambian,Foreign Mission,03/09/2023,,"Lusaka, Zambia"
-Developer,"Lusaka, Zambia",10000,,5,No,190,,,Automotive,13/11/2023,,"Lusaka, Zambia"
-Digital Marketer,"Lusaka, Zambia",10000,,4,No,,,Zambian,,02/12/2023,,"Lusaka, Zambia"
-Marketing Associate,"Lusaka, Zambia",10000,,4,No,200,Zambia,Zambian,Engineering,27/10/2023,,"Lusaka, Zambia"
-Graphics Designer,"Lusaka, Zambia",13000,,7,Yes,,Zambia,Zambian,,26/11/2023,,"Lusaka, Zambia"
-Marketing manager,"Lusaka, Zambia",16000,,11,Yes,,,,,08/12/2023,,"Lusaka, Zambia"
-Customer Sucess,"Lusaka, Zambia",18000,,12,Yes,,Zambia,Zambian,Tech,14/08/2023,,"Lusaka, Zambia"
-IT Security,"Lusaka, Zambia",18400,,4,Yes,50,Zambia,Zambian,Tech,08/09/2023,,"Lusaka, Zambia"
-Marketing assistant,"Lusaka, Zambia",20000,,10,No,50,Zambia,Zambian,Telecom,28/11/2023,,"Lusaka, Zambia"
-Asset & Liability Management Officer,"Lusaka, Zambia",22690,,8,No,,Zambia,Zambian,,05/12/2023,,"Lusaka, Zambia"
-Account manager (Sales Rep),"Lusaka, Zambia",24000,,5,No,,,,,06/12/2023,,"Lusaka, Zambia"
-Sales & Marketing Manager,"Lusaka, Zambia",25000,,12,Yes,170,Zambia,Zambian,Automotive,11/08/2023,,"Lusaka, Zambia"
-Auditor,"Lusaka, Zambia",26000,,3,Yes,,,,,13/11/2023,,"Lusaka, Zambia"
-Analyst,"Lusaka, Zambia",27000,,7,Yes,,Zambia,,,08/09/2023,,"Lusaka, Zambia"
-Driver,"Lusaka, Zambia",2800,,5,No,,Zambia,Zambian,,20/09/2023,,"Lusaka, Zambia"
-Analyst,"Lusaka, Zambia",27000,,8,No,,Zambia,Zambian,Security,14/12/2023,,"Lusaka, Zambia"
-Network Admin,"Lusaka, Zambia",4000,,3,No,,Zambia,Zambian,Advertising,25/09/2023,,"Lusaka, Zambia"
-Admin Assistant,"Lusaka, Zambia",4500,,1,Yes,,,Zambian,,29/12/2023,,"Lusaka, Zambia"
-Human Resources,"Lusaka, Zambia",8000,,2,No,20,Zambia,Zambian,,17/08/2023,,"Lusaka, Zambia"
-bank intern,"Lusaka, Zambia",5000,,1,No,4000,zambia,Zambian,,03/12/2023,,"Lusaka, Zambia"
-Buyer (Procurement),"Lusaka, Zambia",6000,,4,No,,Zambia,Zambian,,16/09/2023,,"Lusaka, Zambia"
-IT Auditor,"Lusaka, Zambia",6400,,1,No,90,Zambia,Zambian,Accounting/Audit,24/08/2023,,"Lusaka, Zambia"
-Finance Analyst,"Lusaka, Zambia",7000,,3,Yes,100,Zambia,Zambian,Finance,05/09/2023,,"Lusaka, Zambia"
-Data Manager,"Lusaka, Zambia",9000,,4,Yes,,,,Fmcg,16/08/2023,,"Lusaka, Zambia"
-bank teller,"Lusaka, Zambia",9500,,5,No,,Zambia,Zambian,Banking,14/12/2023,,"Lusaka, Zambia"
-Medical laboratory technologist,"Lusaka, Zambia",12000,,3,Yes,200,Zambia,Zambian,Health,18/10/2023,,"Lusaka, Zambia"
-Architect Graduate,"Lusaka, Zambia",15000,,2,Yes,3,Zambia,Zambian,Built Environment,18/09/2023,,"Lusaka, Zambia"
-PR Account Executive,"Lusaka, Zambia",14000,,3,No,,,,,18/09/2023,,"Lusaka, Zambia"
-Systems Administrator,"Lusaka, Zambia",17871,,8,Yes,,Zambia,Zambian,Health/Usaid Project,14/11/2023,,"Lusaka, Zambia"
-Mining Engineer,"Najran, Saudi Arabia",102120,,8,Yes,500,Saudi Arabia,Zambian,Mining,10/12/2023,,"Najran, Saudi Arabia"
-Receptionist,"Ndola, Zambia",2500,,2,No,,,,,22/12/2023,,"Ndola, Zambia"
+Finance Manager,Zambia,40000,,15,Yes,150,Zambia,Zambian,Events Services,01/11/2025,,Zambia
+Administration Officer,Zambia,25000,,10,Yes,50,Zambia,Zambian,Medical Practice,01/11/2025,,Zambia
+Japanese Animator,Japan,30000,,3,No,,Zambia,Zambian,Animation,07/09/2023,,Japan
+Junior Network Engineer,Zambia,11800,,0,Yes,1500,Zambia,Zambian,It,13/08/2023,,Zambia
+Engineer,Zambia,27000,,5,Yes,,Zambia,Zambian,Energy,10/08/2023,,Zambia
+Accounts Assistant,Zambia,6500,,1,Yes,,Zambia,Zambian,,05/10/2023,,Zambia
+Loan Officer,Zambia,8000,,4,Yes,,Zambia,,Finance,14/08/2023,,Zambia
+Systems Administrator,Zambia,17871,,7,Yes,,Zambia,Zambian,Foreign Mission,03/09/2023,,Zambia
+Developer,Zambia,10000,,5,No,190,Zambia,,Automotive,13/11/2023,,Zambia
+Digital Marketer,Zambia,10000,,4,No,,Zambia,Zambian,,02/12/2023,,Zambia
+Marketing Associate,Zambia,10000,,4,No,200,Zambia,Zambian,Engineering,27/10/2023,,Zambia
+Graphics Designer,Zambia,13000,,7,Yes,,Zambia,Zambian,,26/11/2023,,Zambia
+Marketing manager,Zambia,16000,,11,Yes,,Zambia,,,08/12/2023,,Zambia
+Customer Sucess,Zambia,18000,,12,Yes,,Zambia,Zambian,Tech,14/08/2023,,Zambia
+IT Security,Zambia,18400,,4,Yes,50,Zambia,Zambian,Tech,08/09/2023,,Zambia
+Marketing assistant,Zambia,20000,,10,No,50,Zambia,Zambian,Telecom,28/11/2023,,Zambia
+Asset & Liability Management Officer,Zambia,22690,,8,No,,Zambia,Zambian,,05/12/2023,,Zambia
+Account manager (Sales Rep),Zambia,24000,,5,No,,Zambia,,,06/12/2023,,Zambia
+Sales & Marketing Manager,Zambia,25000,,12,Yes,170,Zambia,Zambian,Automotive,11/08/2023,,Zambia
+Auditor,Zambia,26000,,3,Yes,,Zambia,,,13/11/2023,,Zambia
+Analyst,Zambia,27000,,7,Yes,,Zambia,,,08/09/2023,,Zambia
+Driver,Zambia,2800,,5,No,,Zambia,Zambian,,20/09/2023,,Zambia
+Analyst,Zambia,27000,,8,No,,Zambia,Zambian,Security,14/12/2023,,Zambia
+Network Admin,Zambia,4000,,3,No,,Zambia,Zambian,Advertising,25/09/2023,,Zambia
+Admin Assistant,Zambia,4500,,1,Yes,,Zambia,Zambian,,29/12/2023,,Zambia
+Human Resources,Zambia,8000,,2,No,20,Zambia,Zambian,,17/08/2023,,Zambia
+bank intern,Zambia,5000,,1,No,4000,Zambia,Zambian,,03/12/2023,,Zambia
+Buyer (Procurement),Zambia,6000,,4,No,,Zambia,Zambian,,16/09/2023,,Zambia
+IT Auditor,Zambia,6400,,1,No,90,Zambia,Zambian,Accounting/Audit,24/08/2023,,Zambia
+Finance Analyst,Zambia,7000,,3,Yes,100,Zambia,Zambian,Finance,05/09/2023,,Zambia
+Data Manager,Zambia,9000,,4,Yes,,Zambia,,Fmcg,16/08/2023,,Zambia
+bank teller,Zambia,9500,,5,No,,Zambia,Zambian,Banking,14/12/2023,,Zambia
+Medical laboratory technologist,Zambia,12000,,3,Yes,200,Zambia,Zambian,Health,18/10/2023,,Zambia
+Architect Graduate,Zambia,15000,,2,Yes,3,Zambia,Zambian,Built Environment,18/09/2023,,Zambia
+PR Account Executive,Zambia,14000,,3,No,,Zambia,,,18/09/2023,,Zambia
+Systems Administrator,Zambia,17871,,8,Yes,,Zambia,Zambian,Health/Usaid Project,14/11/2023,,Zambia
+Mining Engineer,Saudi Arabia,102120,,8,Yes,500,Saudi Arabia,Zambian,Mining,10/12/2023,,Saudi Arabia
+Receptionist,Zambia,2500,,2,No,,Zambia,,,22/12/2023,,Zambia
 Customer Support Agent,Remote,58719,,3,No,200,Zambia,,Tech,26/10/2023,,Remote
 Cloud Support Technician,Remote,84249,,6,No,900,Zambia,Zambian,Tech,17/11/2023,,Remote
-Sales/ Warehousing,"Solwezi, Zambia",17000,,4,Yes,,,Zambian,Mining,07/10/2023,,"Solwezi, Zambia"
-Transport Planner,"Solwezi, Zambia",27000,,8,Yes,,Zambia,Zambian,,06/08/2023,,"Solwezi, Zambia"
-Tax Accountant,"Solwezi, Zambia",39000,,8,No,,Zambia,Zambian,,22/12/2023,,"Solwezi, Zambia"
-Driver,"Polokwane, South Africa",2800,,15,No,100,"Polokwane, South Africa",South African,Food Production,01/11/2025,,"Polokwane, South Africa"
-Driver,"Gweru, Zimbabwe",2800,,10,No,40,"Gweru, Zimbabwe",Zimbabwean,Electrical/Electronic Manufacturing,01/11/2025,,"Gweru, Zimbabwe"
-HR officer,"Lusaka, Zambia",7000,,2,No,120,"Kitwe, Zambia",Zambian,Automotive,05/11/2025,,"Lusaka, Zambia"
+Sales/ Warehousing,Zambia,17000,,4,Yes,,Zambia,Zambian,Mining,07/10/2023,,Zambia
+Transport Planner,Zambia,27000,,8,Yes,,Zambia,Zambian,,06/08/2023,,Zambia
+Tax Accountant,Zambia,39000,,8,No,,Zambia,Zambian,,22/12/2023,,Zambia
+Driver,South Africa,2800,,15,No,100,South Africa,South African,Food Production,01/11/2025,,South Africa
+Driver,Zimbabwe,2800,,10,No,40,Zimbabwe,Zimbabwean,Electrical/Electronic Manufacturing,01/11/2025,,Zimbabwe
+HR officer,Zambia,7000,,2,No,120,Zambia,Zambian,Automotive,05/11/2025,,Zambia
 Junior Software devloper,South Africa,35000,,2,Yes,200,South Africa,South African,Warehousing,05/11/2025,,South Africa
