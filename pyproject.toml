@@ -11,7 +11,5 @@ dependencies = [
     "streamlit>=1.51.0",
     "trafilatura>=2.0.0",
     "forex-python>=1.9.2",
-    "psycopg2-binary>=2.9.11",
-    "sqlalchemy>=2.0.44",
     "python-dotenv>=1.2.1",
 ]
