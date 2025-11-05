@@ -212,16 +212,59 @@ def _read_csv_safe(path: Path) -> pd.DataFrame:
             pass
         dates = dates.fillna(pd.Timestamp.utcnow())
         df["Submission Date"] = dates.astype("datetime64[ns]")
-        # Persist cleaned NEW_CSV back to disk so dataset stays fixed on disk
+        # Persist cleaned NEW_CSV back to disk so dataset stays fixed on disk.
+        # This write can fail on Windows if another process has the file open; don't abort load on failure.
         if path == NEW_CSV:
-            df_to_write = df.copy()
-            # Ensure dates are written as ISO yyyy-mm-dd
-            df_to_write["Submission Date"] = pd.to_datetime(df_to_write["Submission Date"], errors="coerce").dt.strftime("%Y-%m-%d")
-            with _lock:
-                df_to_write.to_csv(path, index=False, encoding="utf-8")
+            try:
+                df_to_write = df.copy()
+                # Ensure dates are written as ISO yyyy-mm-dd
+                df_to_write["Submission Date"] = pd.to_datetime(df_to_write["Submission Date"], errors="coerce").dt.strftime("%Y-%m-%d")
+                with _lock:
+                    df_to_write.to_csv(path, index=False, encoding="utf-8")
+            except Exception:
+                # Non-fatal: keep using the in-memory cleaned DataFrame
+                pass
         return df
-    except Exception:
-        return pd.DataFrame(columns=CANONICAL_COLUMNS)
+    except Exception as e:
+        # Graceful fallback: return a minimally cleaned CSV instead of empty
+        try:
+            fallback = pd.read_csv(path, dtype=str, keep_default_na=False)
+            fallback = _map_columns(fallback)
+            # Trim strings
+            for c in fallback.columns:
+                if fallback[c].dtype == object:
+                    fallback[c] = fallback[c].astype(str).str.strip().str.strip('"')
+            # Minimal normalizations
+            if "Degree" in fallback.columns:
+                fallback["Degree"] = fallback["Degree"].str.strip().str.title().replace({"Yes": "Yes", "No": "No"})
+            if "Nationality" in fallback.columns:
+                nat = fallback["Nationality"].str.strip().str.title()
+                fallback["Nationality"] = nat.replace({"Zambia": "Zambian"})
+            if "Industry" in fallback.columns:
+                fallback["Industry"] = fallback["Industry"].astype(str).str.strip()
+                fallback["Industry"] = fallback["Industry"].replace({
+                    "FCMG": "FMCG",
+                    "FINANCE": "Finance",
+                    "banking": "Banking",
+                }).str.title()
+            # Numeric coercion
+            if "Monthly Gross Salary (in ZMW)" in fallback.columns:
+                fallback["Monthly Gross Salary (in ZMW)"] = pd.to_numeric(fallback["Monthly Gross Salary (in ZMW)"], errors="coerce")
+            if "Salary Gross in USD" in fallback.columns:
+                fallback["Salary Gross in USD"] = pd.to_numeric(fallback["Salary Gross in USD"], errors="coerce")
+            if "Years of Experience" in fallback.columns:
+                fallback["Years of Experience"] = pd.to_numeric(fallback["Years of Experience"], errors="coerce")
+            # Dates (day-first for this CSV)
+            if "Submission Date" in fallback.columns:
+                dates = pd.to_datetime(fallback["Submission Date"], errors="coerce", dayfirst=True)
+                dates = dates.fillna(pd.Timestamp.utcnow())
+                fallback["Submission Date"] = dates.astype("datetime64[ns]")
+            # Compatibility column
+            if "Company location" in fallback.columns and "Company location (Country)" not in fallback.columns:
+                fallback["Company location (Country)"] = fallback["Company location"]
+            return fallback
+        except Exception:
+            return pd.DataFrame(columns=CANONICAL_COLUMNS)
 
 def load_data() -> pd.DataFrame:
     """
@@ -232,7 +275,20 @@ def load_data() -> pd.DataFrame:
     _ensure_csv_exists(NEW_CSV)
     df = _read_csv_safe(NEW_CSV)
     if df.empty:
-        return pd.DataFrame(columns=CANONICAL_COLUMNS)
+        # Last-chance tolerant read to avoid empty UI if normalization failed silently
+        try:
+            raw = pd.read_csv(NEW_CSV, dtype=str, keep_default_na=False)
+            raw = _map_columns(raw)
+            # minimal coercions for UI
+            if "Monthly Gross Salary (in ZMW)" in raw.columns:
+                raw["Monthly Gross Salary (in ZMW)"] = pd.to_numeric(raw["Monthly Gross Salary (in ZMW)"], errors="coerce")
+            if "Salary Gross in USD" in raw.columns:
+                raw["Salary Gross in USD"] = pd.to_numeric(raw["Salary Gross in USD"], errors="coerce")
+            if "Submission Date" in raw.columns:
+                raw["Submission Date"] = pd.to_datetime(raw["Submission Date"], errors="coerce", dayfirst=True)
+            df = raw
+        except Exception:
+            return pd.DataFrame(columns=CANONICAL_COLUMNS)
     # keep canonical columns and compatibility name expected by filters
     if "Company location" in df.columns and "Company location (Country)" not in df.columns:
         df["Company location (Country)"] = df["Company location"]

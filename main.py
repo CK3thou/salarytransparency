@@ -162,7 +162,9 @@ def main():
         with metrics[0]:
             st.metric("Total Entries", len(df))
         with metrics[1]:
-            avg_salary = df['Monthly Gross Salary (in ZMW)'].mean()
+            # Be robust: coerce to numeric in case upstream fallback left strings
+            s = pd.to_numeric(df.get('Monthly Gross Salary (in ZMW)'), errors='coerce')
+            avg_salary = float(s.mean()) if s is not None and len(s) else 0.0
             st.metric("Average Salary (ZMW)", f"{avg_salary:,.2f}")
         with metrics[2]:
             unique_roles = len(df['Role'].unique())
