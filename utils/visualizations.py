@@ -83,13 +83,27 @@ def create_industry_salary_box(df):
     return fig
 
 def create_degree_distribution(df):
-    """Create pie chart of degree distribution"""
+    """Create pie chart of degree distribution with fixed colors.
+
+    Colors:
+    - No  -> red
+    - Yes -> blue
+    """
+    # Ensure consistent ordering and labels
     degree_counts = df['Degree'].value_counts()
+    counts_df = degree_counts.reset_index()
+    counts_df.columns = ['Degree', 'Count']
 
     fig = px.pie(
-        values=degree_counts.values,
-        names=degree_counts.index,
+        counts_df,
+        values='Count',
+        names='Degree',
         title='Education Level Distribution',
+        color='Degree',
+        color_discrete_map={
+            'No': 'red',
+            'Yes': 'blue',
+        },
     )
     fig.update_layout(
         height=400,
