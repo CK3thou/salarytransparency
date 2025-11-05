@@ -118,6 +118,22 @@ def main():
             wdf = pd.read_csv(path, dtype=str)
             wdf = wdf[['Location', 'Currency Code']].dropna()
             wdf['Location'] = wdf['Location'].astype(str).str.strip().str.lower()
+            # Normalize currency code to first 3-letter token (handle slashes/parentheses)
+            def norm_code(x: str) -> str:
+                x = str(x)
+                # remove text in parentheses
+                if '(' in x:
+                    x = x.split('(')[0]
+                # split by slash or comma and take first
+                for sep in ['/', ',']:
+                    if sep in x:
+                        x = x.split(sep)[0]
+                x = x.strip().upper()
+                # take only 3-letter code if longer
+                if len(x) >= 3:
+                    x = x[:3]
+                return x
+            wdf['Currency Code'] = wdf['Currency Code'].map(norm_code)
             wdf = wdf.drop_duplicates(subset=['Location'])
             return dict(zip(wdf['Location'], wdf['Currency Code']))
         except Exception:
@@ -134,6 +150,37 @@ def main():
 
         with st.spinner("Loading data..."):
             df = load_data()
+            # Session-local pending rows (in case writes are ephemeral on cloud)
+            try:
+                pending = st.session_state.get("local_rows", [])
+                if pending:
+                    add_df = pd.DataFrame(pending)
+                    # Minimal normalization to expected columns
+                    # Keep only known columns, add missing ones as blanks
+                    expected = [
+                        'Role','Company location','Company location (Country)','Monthly Gross Salary',
+                        'Salary Gross in USD','Years of Experience','Degree',
+                        'Approx. No. of employees in company','Your Country/ Location',
+                        'Nationality','Industry','Submission Date','Real-time USD ZMW exchange rate'
+                    ]
+                    for c in expected:
+                        if c not in add_df.columns:
+                            add_df[c] = ''
+                    add_df = add_df[expected].copy()
+                    # Coerce date to dd/mm/YYYY display format
+                    add_df['Submission Date'] = pd.to_datetime(
+                        add_df['Submission Date'], errors='coerce', dayfirst=True
+                    ).dt.strftime('%d/%m/%Y')
+                    # Coerce numeric
+                    add_df['Monthly Gross Salary'] = pd.to_numeric(add_df['Monthly Gross Salary'], errors='coerce')
+                    add_df['Salary Gross in USD'] = pd.to_numeric(add_df['Salary Gross in USD'], errors='coerce')
+                    # Prefer the explicit country column for display compatibility
+                    mask_missing_country = add_df['Company location (Country)'].astype(str).str.strip().eq('')
+                    add_df.loc[mask_missing_country, 'Company location (Country)'] = add_df.loc[mask_missing_country, 'Company location']
+                    # Combine for display
+                    df = pd.concat([df, add_df], ignore_index=True)
+            except Exception:
+                pass
         if df.empty:
             st.info("No salary data available yet. Be the first to contribute!")
         else:
@@ -154,6 +201,118 @@ def main():
                         df['Currency Code'] = currency_code.fillna('')
             except Exception:
                 # Non-fatal if currency map fails
+                pass
+            # Derive USD equivalent using a single batched FX fetch (avoids many slow calls)
+            @st.cache_data(ttl=21600, show_spinner=False)
+            def get_rates_code_to_usd() -> dict:
+                """Return a payload with CODE -> rate(code->USD) and source info.
+                Order: provider from secrets -> exchangerate.host -> default.
+                Returns: { 'rates': {...}, 'source': 'secrets:<prov>|exchangerate.host|default' }
+                """
+                # 1) Provider from secrets (supports several popular APIs)
+                try:
+                    fx = dict(st.secrets.get('forex', {}))
+                    provider = str(fx.get('provider', '')).strip().lower()
+                    api_key = fx.get('api_key') or fx.get('key') or fx.get('token')
+                    base = str(fx.get('base', 'USD')).upper() if fx.get('base') else 'USD'
+                except Exception:
+                    fx, provider, api_key, base = {}, '', None, 'USD'
+
+                def _return(rates: dict, src: str) -> dict:
+                    # Normalize keys and ensure USD present
+                    out = {'USD': 1.0}
+                    for k, v in (rates or {}).items():
+                        try:
+                            if v is None:
+                                continue
+                            out[str(k).upper()] = float(v)
+                        except Exception:
+                            continue
+                    return {'rates': out, 'source': src}
+
+                try:
+                    if provider and api_key:
+                        import json, urllib.request
+                        if provider in ('exchange-rate-api', 'exchangerateapi', 'exchangerate-api'):
+                            url = f"https://v6.exchangerate-api.com/v6/{api_key}/latest/USD"
+                            with urllib.request.urlopen(url, timeout=4) as resp:
+                                data = json.loads(resp.read().decode('utf-8'))
+                                cr = data.get('conversion_rates', {}) or {}
+                                # conversion_rates: USD->CODE, invert to CODE->USD
+                                inv = {c: (1.0/float(r) if float(r) != 0 else None) for c, r in cr.items()}
+                                return _return(inv, 'secrets:exchangerate-api')
+                        elif provider in ('openexchangerates', 'oer'):
+                            url = f"https://openexchangerates.org/api/latest.json?app_id={api_key}"
+                            with urllib.request.urlopen(url, timeout=4) as resp:
+                                data = json.loads(resp.read().decode('utf-8'))
+                                rates = data.get('rates', {}) or {}
+                                inv = {c: (1.0/float(r) if float(r) != 0 else None) for c, r in rates.items()}
+                                return _return(inv, 'secrets:openexchangerates')
+                        elif provider in ('currencylayer',):
+                            url = f"http://api.currencylayer.com/live?access_key={api_key}"
+                            with urllib.request.urlopen(url, timeout=4) as resp:
+                                data = json.loads(resp.read().decode('utf-8'))
+                                quotes = data.get('quotes', {}) or {}
+                                # quotes: {'USDZMW': rate}, invert to CODE->USD
+                                inv = {}
+                                for pair, r in quotes.items():
+                                    if isinstance(pair, str) and pair.startswith('USD'):
+                                        code = pair[3:].upper()
+                                        rv = float(r)
+                                        inv[code] = (1.0/rv if rv != 0 else None)
+                                return _return(inv, 'secrets:currencylayer')
+                        elif provider in ('fixer', 'fixer.io'):
+                            # base may be restricted on free plans; compute via returned base
+                            url = f"http://data.fixer.io/api/latest?access_key={api_key}"
+                            with urllib.request.urlopen(url, timeout=4) as resp:
+                                data = json.loads(resp.read().decode('utf-8'))
+                                rates = data.get('rates', {}) or {}
+                                resp_base = str(data.get('base', 'EUR')).upper()
+                                # code->USD = (USD per base) / (CODE per base)
+                                r_usd = float(rates.get('USD', 0)) if 'USD' in rates else 0.0
+                                inv = {}
+                                if resp_base == 'USD':
+                                    inv = {c: (1.0/float(r) if float(r) != 0 else None) for c, r in rates.items()}
+                                elif r_usd:
+                                    for c, r in rates.items():
+                                        try:
+                                            inv[c] = (r_usd / float(r) if float(r) != 0 else None)
+                                        except Exception:
+                                            continue
+                                return _return(inv, 'secrets:fixer')
+                        # Unknown provider names can be added similarly
+                except Exception:
+                    # fall through to public HTTP
+                    pass
+
+                # 2) Public HTTP (exchangerate.host base USD)
+                try:
+                    import json, urllib.request
+                    url = "https://api.exchangerate.host/latest?base=USD"
+                    with urllib.request.urlopen(url, timeout=3) as resp:
+                        data = json.loads(resp.read().decode('utf-8'))
+                        rates = data.get('rates', {}) or {}
+                        inv = {c: (1.0/float(r) if float(r) != 0 else None) for c, r in rates.items()}
+                        return _return(inv, 'exchangerate.host')
+                except Exception:
+                    pass
+
+                # 3) Last resort
+                return _return({'USD': 1.0}, 'default')
+
+            try:
+                # Ensure numeric salary
+                if 'Monthly Gross Salary' in df.columns:
+                    df['Monthly Gross Salary'] = pd.to_numeric(df['Monthly Gross Salary'], errors='coerce')
+                # Compute rates once, then map per row
+                if 'Currency Code' in df.columns and 'Monthly Gross Salary' in df.columns:
+                    codes = df['Currency Code'].astype(str).str.upper().fillna('')
+                    payload = get_rates_code_to_usd()
+                    rates_map = payload.get('rates', {})
+                    st.session_state['fx_source'] = payload.get('source', '')
+                    rates = codes.map(lambda x: rates_map.get(x, None)).astype(float)
+                    df['Monthly Salary in USD'] = df['Monthly Gross Salary'] * rates
+            except Exception:
                 pass
             # If a recent submission exists from the form, show a toast and a compact preview
             if "recent_submission" in st.session_state:
@@ -196,16 +355,30 @@ def main():
         with metrics[0]:
             st.metric("Total Entries", len(df))
         with metrics[1]:
-            # Be robust: coerce to numeric in case upstream fallback left strings
-            s = pd.to_numeric(df.get('Monthly Gross Salary'), errors='coerce')
+            # Average in USD if available
+            s = pd.to_numeric(df.get('Monthly Salary in USD'), errors='coerce')
             avg_salary = float(s.mean()) if s is not None and len(s) else 0.0
-            st.metric("Average Salary", f"{avg_salary:,.2f}")
+            st.metric("Average Salary (USD)", f"{avg_salary:,.2f}")
         with metrics[2]:
             unique_roles = len(df['Role'].unique())
             st.metric("Unique Roles", unique_roles)
 
+        # Optional FX source caption for debugging/visibility
+        try:
+            fx_src = st.session_state.get('fx_source', '')
+            if fx_src:
+                st.caption(f"Rates: {fx_src} (cached)")
+        except Exception:
+            pass
+
         # Data table with horizontal scroll on mobile (all data from new_salary.csv)
         st.subheader("All Data")
+        # Hint if FX-derived USD values are missing
+        try:
+            if 'Monthly Salary in USD' not in df.columns or pd.to_numeric(df.get('Monthly Salary in USD'), errors='coerce').notna().sum() == 0:
+                st.info("Live FX rates unavailable or not yet loaded; USD values may be blank.")
+        except Exception:
+            pass
         try:
             st.markdown('<div class="table-container">', unsafe_allow_html=True)
             # Build display DataFrame and ensure Currency Code is inserted before Monthly Gross Salary
@@ -215,7 +388,7 @@ def main():
                 display_df['Currency Code'] = ''
 
             # Desired display order (will filter by availability)
-            desired_order = ['Role', 'Currency Code', 'Monthly Gross Salary',
+            desired_order = ['Role', 'Currency Code', 'Monthly Gross Salary', 'Monthly Salary in USD',
                              'Years of Experience', 'Industry', 'Company location (Country)',
                              'Submission Date']
             display_cols = [c for c in desired_order if c in display_df.columns]
@@ -276,7 +449,7 @@ def main():
         try:
             st.markdown("### Top Roles by Salary")
             fig = create_top_roles_salary(df)
-            st.plotly_chart(fig, use_container_width=True, config={'responsive': True})
+            st.plotly_chart(fig, width='stretch', config={'responsive': True})
         except Exception as e:
             st.error(f"Error creating role analysis chart: {str(e)}")
     else:

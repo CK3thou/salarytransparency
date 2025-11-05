@@ -1,0 +1,26 @@
+{
+  "base": "USD",
+  "as_of": "2025-11-06",
+  "note": "code_to_usd maps 1 unit of CURRENCY to its USD value. Example: if 1 ZMW = 0.038 USD, code_to_usd.ZMW = 0.038",
+  "code_to_usd": {
+    "USD": 1.0,
+    "EUR": 1.07,
+    "GBP": 1.28,
+    "ZMW": 0.038,
+    "ZAR": 0.054,
+    "ZWL": 0.003,
+    "NAD": 0.054,
+    "BWP": 0.073,
+    "MWK": 0.00059,
+    "MZN": 0.016,
+    "TZS": 0.00038,
+    "UGX": 0.00027,
+    "KES": 0.0062,
+    "GHS": 0.073,
+    "NGN": 0.00065,
+    "AUD": 0.66,
+    "CAD": 0.73,
+    "INR": 0.012,
+    "JPY": 0.0066
+  }
+}

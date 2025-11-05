@@ -50,36 +50,12 @@ def submission_form(save_callback):
                 key="location_mobile",
             )
             
-            # Salary inputs with currency conversion
+            # Salary input in local currency (see Currency Code column in table)
             salary_zmw = st.number_input(
                 "Monthly Gross Salary*",
                 min_value=0.0,
                 step=100.0,
             )
-            
-            salary_usd = st.number_input(
-                "Salary in USD",
-                min_value=0.0,
-                value=0.0,
-                key="salary_usd_mobile"
-                # Remove on_change here
-            )
-            
-            # Function to update USD salary when ZMW changes
-            def update_usd_salary():
-                rate = get_exchange_rate()
-                if rate and salary_zmw > 0:
-                    converted_usd = salary_zmw / rate
-                    st.session_state.salary_usd_mobile = converted_usd
-                    st.info(f"Converted USD amount: {converted_usd:.2f}")
-            
-            # Function to update ZMW salary when USD changes
-            def update_zmw_salary():
-                rate = get_exchange_rate()
-                if rate and salary_usd > 0:
-                    converted_zmw = salary_usd * rate
-                    st.session_state.salary_zmw_mobile = converted_zmw
-                    st.info(f"Converted ZMW amount: {converted_zmw:.2f}")
             
             experience = st.number_input(
                 "Years of Experience*",
@@ -178,7 +154,7 @@ def submission_form(save_callback):
                 'Role': role,
                 'Company location (Country)': company_location,
                 'Monthly Gross Salary': salary_zmw,
-                'Salary Gross in USD': salary_usd if salary_usd > 0 else None,
+                # No direct USD input; USD will be derived in-app using FX rates
                 'Years of Experience': experience,
                 'Degree': degree,
                 'Approx. No. of employees in company': employees,
@@ -190,6 +166,14 @@ def submission_form(save_callback):
             if save_callback(data):
                 # Store recent submission in session so main app can toast and highlight it
                 st.session_state["recent_submission"] = data
+                # Also keep a session-local buffer so the row appears immediately
+                # even if the deploy environment has a read-only or ephemeral FS
+                try:
+                    buf = st.session_state.get("local_rows", [])
+                    buf.append(dict(data))
+                    st.session_state["local_rows"] = buf
+                except Exception:
+                    pass
                 st.success("Thank you for your submission!")
                 # Rerun to refresh the main table immediately
                 st.rerun()
