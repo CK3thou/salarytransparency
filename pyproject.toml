@@ -11,5 +11,4 @@ dependencies = [
     "streamlit>=1.51.0",
     "trafilatura>=2.0.0",
     "forex-python>=1.9.2",
-    "python-dotenv>=1.2.1",
 ]

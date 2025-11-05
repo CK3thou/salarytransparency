@@ -1,14 +1,8 @@
 """
-DEPRECATED: Database migration script is no longer used.
-The application persists data in CSV only (data/new_salary.csv).
+REMOVED: This file is no longer used and kept as a placeholder to avoid accidental re-creation.
+
+All data is stored in data/new_salary.csv. No database is used by this app.
 """
 
-import sys
-
-def main():
-    print("migrate_csv_to_db.py is deprecated and no longer used.")
-    return 0
-
-if __name__ == "__main__":
-    sys.exit(main())
+raise SystemExit("migrate_csv_to_db.py has been removed (CSV-only app).")
 
