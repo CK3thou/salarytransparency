@@ -202,103 +202,68 @@ def main():
             except Exception:
                 # Non-fatal if currency map fails
                 pass
-            # Derive USD equivalent using a single batched FX fetch (avoids many slow calls)
+            # Derive USD equivalent using forexrateapi.com in one batched call (cached)
             @st.cache_data(ttl=21600, show_spinner=False)
-            def get_rates_code_to_usd() -> dict:
-                """Return a payload with CODE -> rate(code->USD) and source info.
-                Order: provider from secrets -> exchangerate.host -> default.
-                Returns: { 'rates': {...}, 'source': 'secrets:<prov>|exchangerate.host|default' }
+            def get_rates_code_to_usd(codes_csv: str) -> dict:
+                """Fetch CODE->USD rates using forexrateapi.com with USD base.
+                Args:
+                    codes_csv: Comma-separated list of 3-letter currency codes to request.
+                Returns:
+                    { 'rates': { CODE: rate(code->USD), ... }, 'source': 'forexrateapi.com' }
                 """
-                # 1) Provider from secrets (supports several popular APIs)
-                try:
-                    fx = dict(st.secrets.get('forex', {}))
-                    provider = str(fx.get('provider', '')).strip().lower()
-                    api_key = fx.get('api_key') or fx.get('key') or fx.get('token')
-                    base = str(fx.get('base', 'USD')).upper() if fx.get('base') else 'USD'
-                except Exception:
-                    fx, provider, api_key, base = {}, '', None, 'USD'
+                import json
+                import urllib.request
+                import urllib.parse
 
-                def _return(rates: dict, src: str) -> dict:
-                    # Normalize keys and ensure USD present
+                # API key resolution: prefer secrets/env, fallback to provided key
+                api_key = None
+                try:
+                    # Try flat secret first, then nested
+                    api_key = st.secrets.get('forexrateapi_api_key')
+                    if not api_key and 'forexrateapi' in st.secrets:
+                        api_key = st.secrets['forexrateapi'].get('api_key')
+                except Exception:
+                    api_key = None
+                if not api_key:
+                    api_key = os.environ.get('FOREXRATEAPI_API_KEY')
+                if not api_key:
+                    # Fallback to user-provided key
+                    api_key = '1e5ce0b6f7f9b60ffeb7b5f60dcf095d'
+
+                params = {
+                    'api_key': api_key,
+                    'base': 'USD',
+                    'currencies': codes_csv,
+                }
+                url = 'https://api.forexrateapi.com/v1/latest?' + urllib.parse.urlencode(params, safe=',')
+
+                def _return(inv: dict) -> dict:
                     out = {'USD': 1.0}
-                    for k, v in (rates or {}).items():
+                    for k, v in (inv or {}).items():
                         try:
                             if v is None:
                                 continue
                             out[str(k).upper()] = float(v)
                         except Exception:
                             continue
-                    return {'rates': out, 'source': src}
+                    return {'rates': out, 'source': 'forexrateapi.com'}
 
                 try:
-                    if provider and api_key:
-                        import json, urllib.request
-                        if provider in ('exchange-rate-api', 'exchangerateapi', 'exchangerate-api'):
-                            url = f"https://v6.exchangerate-api.com/v6/{api_key}/latest/USD"
-                            with urllib.request.urlopen(url, timeout=4) as resp:
-                                data = json.loads(resp.read().decode('utf-8'))
-                                cr = data.get('conversion_rates', {}) or {}
-                                # conversion_rates: USD->CODE, invert to CODE->USD
-                                inv = {c: (1.0/float(r) if float(r) != 0 else None) for c, r in cr.items()}
-                                return _return(inv, 'secrets:exchangerate-api')
-                        elif provider in ('openexchangerates', 'oer'):
-                            url = f"https://openexchangerates.org/api/latest.json?app_id={api_key}"
-                            with urllib.request.urlopen(url, timeout=4) as resp:
-                                data = json.loads(resp.read().decode('utf-8'))
-                                rates = data.get('rates', {}) or {}
-                                inv = {c: (1.0/float(r) if float(r) != 0 else None) for c, r in rates.items()}
-                                return _return(inv, 'secrets:openexchangerates')
-                        elif provider in ('currencylayer',):
-                            url = f"http://api.currencylayer.com/live?access_key={api_key}"
-                            with urllib.request.urlopen(url, timeout=4) as resp:
-                                data = json.loads(resp.read().decode('utf-8'))
-                                quotes = data.get('quotes', {}) or {}
-                                # quotes: {'USDZMW': rate}, invert to CODE->USD
-                                inv = {}
-                                for pair, r in quotes.items():
-                                    if isinstance(pair, str) and pair.startswith('USD'):
-                                        code = pair[3:].upper()
-                                        rv = float(r)
-                                        inv[code] = (1.0/rv if rv != 0 else None)
-                                return _return(inv, 'secrets:currencylayer')
-                        elif provider in ('fixer', 'fixer.io'):
-                            # base may be restricted on free plans; compute via returned base
-                            url = f"http://data.fixer.io/api/latest?access_key={api_key}"
-                            with urllib.request.urlopen(url, timeout=4) as resp:
-                                data = json.loads(resp.read().decode('utf-8'))
-                                rates = data.get('rates', {}) or {}
-                                resp_base = str(data.get('base', 'EUR')).upper()
-                                # code->USD = (USD per base) / (CODE per base)
-                                r_usd = float(rates.get('USD', 0)) if 'USD' in rates else 0.0
-                                inv = {}
-                                if resp_base == 'USD':
-                                    inv = {c: (1.0/float(r) if float(r) != 0 else None) for c, r in rates.items()}
-                                elif r_usd:
-                                    for c, r in rates.items():
-                                        try:
-                                            inv[c] = (r_usd / float(r) if float(r) != 0 else None)
-                                        except Exception:
-                                            continue
-                                return _return(inv, 'secrets:fixer')
-                        # Unknown provider names can be added similarly
-                except Exception:
-                    # fall through to public HTTP
-                    pass
-
-                # 2) Public HTTP (exchangerate.host base USD)
-                try:
-                    import json, urllib.request
-                    url = "https://api.exchangerate.host/latest?base=USD"
-                    with urllib.request.urlopen(url, timeout=3) as resp:
+                    with urllib.request.urlopen(url, timeout=4) as resp:
                         data = json.loads(resp.read().decode('utf-8'))
-                        rates = data.get('rates', {}) or {}
-                        inv = {c: (1.0/float(r) if float(r) != 0 else None) for c, r in rates.items()}
-                        return _return(inv, 'exchangerate.host')
+                        # API returns USD->CODE rates; convert to CODE->USD
+                        usd_to_code = data.get('rates', {}) or {}
+                        inv = {}
+                        for c, r in usd_to_code.items():
+                            try:
+                                rv = float(r)
+                                inv[str(c).upper()] = (1.0 / rv) if rv != 0 else None
+                            except Exception:
+                                continue
+                        return _return(inv)
                 except Exception:
-                    pass
-
-                # 3) Last resort
-                return _return({'USD': 1.0}, 'default')
+                    # Last resort: only USD
+                    return _return({'USD': 1.0})
 
             try:
                 # Ensure numeric salary
@@ -307,7 +272,9 @@ def main():
                 # Compute rates once, then map per row
                 if 'Currency Code' in df.columns and 'Monthly Gross Salary' in df.columns:
                     codes = df['Currency Code'].astype(str).str.upper().fillna('')
-                    payload = get_rates_code_to_usd()
+                    unique_codes = sorted(set([c for c in codes.tolist() if c and c != 'USD']))
+                    codes_csv = ','.join(unique_codes)
+                    payload = get_rates_code_to_usd(codes_csv)
                     rates_map = payload.get('rates', {})
                     st.session_state['fx_source'] = payload.get('source', '')
                     rates = codes.map(lambda x: rates_map.get(x, None)).astype(float)

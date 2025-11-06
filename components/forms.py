@@ -2,29 +2,6 @@ import streamlit as st
 from datetime import datetime
 from utils.data_handler import get_locations, get_nationalities, get_industries
 
-# Attempt to import forex-python; if it's not installed, keep the app running
-try:
-    from forex_python.converter import CurrencyRates
-    _HAS_FOREX = True
-except Exception:
-    CurrencyRates = None
-    _HAS_FOREX = False
-
-def get_exchange_rate():
-    """Get current exchange rate from USD to ZMW"""
-    try:
-        if not _HAS_FOREX:
-            # forex-python not installed; inform user and return None
-            st.warning("Currency conversion unavailable: install 'forex-python' to enable this feature.")
-            return None
-
-        c = CurrencyRates()
-        rate = c.get_rate('USD', 'ZMW')
-        return rate
-    except Exception as e:
-        st.error(f"Error getting exchange rate: {str(e)}")
-        return None
-
 def submission_form(save_callback):
     """Render and handle the salary submission form"""
     # Removed the standalone exchange rate button for a cleaner UI

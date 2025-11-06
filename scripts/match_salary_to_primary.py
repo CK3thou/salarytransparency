@@ -3,14 +3,6 @@ import sys
 from pathlib import Path
 import pandas as pd
 
-# Optional forex conversion
-try:
-    from forex_python.converter import CurrencyRates  # type: ignore
-    _HAS_FOREX = True
-except Exception:
-    CurrencyRates = None  # type: ignore
-    _HAS_FOREX = False
-
 ROOT = Path(__file__).resolve().parents[1]
 CSV_PATH = ROOT / 'data' / 'new_salary.csv'
 
@@ -50,22 +42,10 @@ def main() -> int:
         usd_series = pd.to_numeric(df['Salary Gross in USD'], errors='coerce')
         mask = df['Monthly Gross Salary'].astype(str).str.strip().eq('') & usd_series.notna()
         if mask.any():
-            if _HAS_FOREX:
-                try:
-                    rate = CurrencyRates().get_rate('USD', 'ZMW')
-                except Exception as e:
-                    rate = None
-                if rate:
-                    df.loc[mask, 'Monthly Gross Salary'] = (usd_series[mask] * rate).round(2).astype(str)
-                    converted_from_usd = int(mask.sum())
-                else:
-                    # Fallback: copy USD as text (not ideal, but requested to match entries)
-                    df.loc[mask, 'Monthly Gross Salary'] = usd_series[mask].round(2).astype(str)
-                    usd_copied_no_fx = int(mask.sum())
-            else:
-                # No forex-python: copy USD value as-is to match entries
-                df.loc[mask, 'Monthly Gross Salary'] = usd_series[mask].round(2).astype(str)
-                usd_copied_no_fx = int(mask.sum())
+            # Do not perform FX here; the app derives USD at runtime.
+            # For backfill, copy USD as-is to avoid introducing FX dependencies.
+            df.loc[mask, 'Monthly Gross Salary'] = usd_series[mask].round(2).astype(str)
+            usd_copied_no_fx = int(mask.sum())
 
     # Write back
     df.to_csv(CSV_PATH, index=False, encoding='utf-8')
