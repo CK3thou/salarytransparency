@@ -2,13 +2,32 @@ import plotly.express as px
 import plotly.graph_objects as go
 import pandas as pd
 
+
+def _pick_salary_column(df: pd.DataFrame) -> tuple[str, str]:
+    """Return (column_name, pretty_label) for salary.
+    Prefer 'Monthly Salary in USD' when available; otherwise fall back to 'Monthly Gross Salary'.
+    """
+    if 'Monthly Salary in USD' in df.columns:
+        # Use USD if the column exists and has any non-null numeric values; else fallback
+        try:
+            s = pd.to_numeric(df['Monthly Salary in USD'], errors='coerce')
+            if s.notna().sum() > 0:
+                return 'Monthly Salary in USD', 'Salary (USD)'
+        except Exception:
+            pass
+    return 'Monthly Gross Salary', 'Salary'
+
 def create_salary_distribution(df):
-    """Create salary distribution chart"""
+    """Create salary distribution chart (uses USD when available)."""
+    col, label = _pick_salary_column(df)
+    # ensure numeric
+    df = df.copy()
+    df[col] = pd.to_numeric(df[col], errors='coerce')
     fig = px.histogram(
         df,
-        x='Monthly Gross Salary',
+        x=col,
         title='Salary Distribution',
-        labels={'Monthly Gross Salary': 'Salary'},
+        labels={col: label},
         opacity=0.7
     )
     fig.update_layout(
@@ -22,17 +41,20 @@ def create_salary_distribution(df):
     return fig
 
 def create_experience_salary_correlation(df):
-    """Create experience vs salary scatter plot with trend line"""
+    """Create experience vs salary scatter plot with trend line (uses USD when available)."""
+    col, label = _pick_salary_column(df)
+    df = df.copy()
+    df[col] = pd.to_numeric(df[col], errors='coerce')
     try:
         # Try to create scatter plot with trend line
         fig = px.scatter(
             df,
             x='Years of Experience',
-            y='Monthly Gross Salary',
+            y=col,
             title='Experience vs Salary Correlation',
             labels={
                 'Years of Experience': 'Experience (Years)',
-                'Monthly Gross Salary': 'Salary'
+                col: label
             },
             trendline="lowess"  # Use lowess instead of ols, more robust
         )
@@ -41,11 +63,11 @@ def create_experience_salary_correlation(df):
         fig = px.scatter(
             df,
             x='Years of Experience',
-            y='Monthly Gross Salary',
+            y=col,
             title='Experience vs Salary Correlation',
             labels={
                 'Years of Experience': 'Experience (Years)',
-                'Monthly Gross Salary': 'Salary'
+                col: label
             }
         )
 
@@ -59,7 +81,10 @@ def create_experience_salary_correlation(df):
     return fig
 
 def create_industry_salary_box(df):
-    """Create box plot of salaries by industry"""
+    """Create box plot of salaries by industry (uses USD when available)."""
+    col, label = _pick_salary_column(df)
+    df = df.copy()
+    df[col] = pd.to_numeric(df[col], errors='coerce')
     # Get top 10 industries by count
     top_industries = df['Industry'].value_counts().nlargest(10).index
 
@@ -69,9 +94,9 @@ def create_industry_salary_box(df):
     fig = px.box(
         df_filtered,
         x='Industry',
-        y='Monthly Gross Salary',
+        y=col,
         title='Salary Ranges by Industry',
-        labels={'Monthly Gross Salary': 'Salary'}
+        labels={col: label}
     )
     fig.update_layout(
         height=500,
@@ -113,9 +138,12 @@ def create_degree_distribution(df):
     return fig
 
 def create_top_roles_salary(df, top_n=10):
-    """Create bar chart of average salaries by role"""
+    """Create bar chart of average salaries by role (uses USD when available)."""
+    col, label = _pick_salary_column(df)
     # Calculate average salary by role
-    role_avg_salary = df.groupby('Role')['Monthly Gross Salary'].agg(['mean', 'count'])
+    role_avg_salary = df.copy()
+    role_avg_salary[col] = pd.to_numeric(role_avg_salary[col], errors='coerce')
+    role_avg_salary = role_avg_salary.groupby('Role')[col].agg(['mean', 'count'])
     # Get top N roles by count
     top_roles = role_avg_salary.nlargest(top_n, 'count')
 
@@ -125,7 +153,7 @@ def create_top_roles_salary(df, top_n=10):
         title=f'Average Salary by Role (Top {top_n} Most Common)',
         labels={
             'x': 'Role',
-            'y': 'Average Salary (ZMW)'
+            'y': f'Average {label}'
         }
     )
     fig.update_layout(
