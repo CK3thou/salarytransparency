@@ -304,7 +304,7 @@ def main():
                                 "Years of Experience": recent.get("Years of Experience", ""),
                                 "Industry": recent.get("Industry", ""),
                             }
-                            st.dataframe(pd.DataFrame([recent_view]), width='stretch', hide_index=True)
+                            st.dataframe(pd.DataFrame([recent_view]), use_container_width=True, hide_index=True)
                     except Exception:
                         # Non-fatal; continue rendering the page
                         pass
@@ -373,7 +373,7 @@ def main():
                 
                 st.dataframe(
                     display_df,
-                    width='stretch',
+                    use_container_width=True,
                     hide_index=True
                 )
             else:
