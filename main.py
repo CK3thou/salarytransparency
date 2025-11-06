@@ -356,7 +356,7 @@ def main():
 
             # Desired display order (will filter by availability)
             desired_order = ['Role', 'Currency Code', 'Monthly Gross Salary', 'Monthly Salary in USD',
-                             'Years of Experience', 'Industry', 'Company location (Country)',
+                             'Years of Experience', 'Industry', 'Nationality', 'Company location (Country)',
                              'Submission Date']
             display_cols = [c for c in desired_order if c in display_df.columns]
 

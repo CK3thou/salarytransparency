@@ -33,6 +33,8 @@ def submission_form(save_callback):
                 min_value=0.0,
                 step=100.0,
             )
+            # Guidance: currency must match the "Your Location" field
+            st.caption("Enter this amount in the currency of your 'Your Location' selection. We'll convert to USD automatically.")
             
             experience = st.number_input(
                 "Years of Experience*",
