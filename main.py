@@ -37,17 +37,33 @@ def main():
         ctx = None
         st.warning(f"Note: Script context detection failed: {e}. App may have limited functionality.")
     
-    # Google Analytics (using components.html for proper script execution)
+    # Google Analytics - inject into page head using full HTML document
     GOOGLE_ANALYTICS_CODE = """
-    <script async src="https://www.googletagmanager.com/gtag/js?id=G-62K86SX2TC"></script>
-    <script>
-      window.dataLayer = window.dataLayer || [];
-      function gtag(){dataLayer.push(arguments);}
-      gtag('js', new Date());
-      gtag('config', 'G-62K86SX2TC');
-    </script>
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <!-- Google tag (gtag.js) -->
+        <script async src="https://www.googletagmanager.com/gtag/js?id=G-62K86SX2TC"></script>
+        <script>
+          window.dataLayer = window.dataLayer || [];
+          function gtag(){dataLayer.push(arguments);}
+          gtag('js', new Date());
+          gtag('config', 'G-62K86SX2TC');
+        </script>
+        <script>
+          // Send to parent window to ensure tracking works
+          if (window.parent) {
+            window.parent.dataLayer = window.parent.dataLayer || [];
+            function parentGtag(){window.parent.dataLayer.push(arguments);}
+            parentGtag('js', new Date());
+            parentGtag('config', 'G-62K86SX2TC');
+          }
+        </script>
+    </head>
+    <body></body>
+    </html>
     """
-    components.html(GOOGLE_ANALYTICS_CODE, height=0)
+    components.html(GOOGLE_ANALYTICS_CODE, height=0, width=0)
 
     # PWA Setup
     st.markdown("""
