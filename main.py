@@ -35,6 +35,19 @@ def main():
         # This allows the app to work even if context detection fails
         ctx = None
         st.warning(f"Note: Script context detection failed: {e}. App may have limited functionality.")
+    # Google Analytics
+    st.markdown("""
+        <!-- Google tag (gtag.js) -->
+        <script async src="https://www.googletagmanager.com/gtag/js?id=G-62K86SX2TC"></script>
+        <script>
+          window.dataLayer = window.dataLayer || [];
+          function gtag(){dataLayer.push(arguments);}
+          gtag('js', new Date());
+
+          gtag('config', 'G-62K86SX2TC');
+        </script>
+    """, unsafe_allow_html=True)
+
     # PWA Setup
     st.markdown("""
         <link rel="manifest" href="./static/manifest.json">
