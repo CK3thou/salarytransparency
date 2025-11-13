@@ -2,6 +2,7 @@ import os
 import sys
 
 import streamlit as st
+import streamlit.components.v1 as components
 import pandas as pd
 from utils.data_handler import load_data, save_submission
 from utils.visualizations import (
@@ -35,18 +36,18 @@ def main():
         # This allows the app to work even if context detection fails
         ctx = None
         st.warning(f"Note: Script context detection failed: {e}. App may have limited functionality.")
-    # Google Analytics
-    st.markdown("""
-        <!-- Google tag (gtag.js) -->
-        <script async src="https://www.googletagmanager.com/gtag/js?id=G-62K86SX2TC"></script>
-        <script>
-          window.dataLayer = window.dataLayer || [];
-          function gtag(){dataLayer.push(arguments);}
-          gtag('js', new Date());
-
-          gtag('config', 'G-62K86SX2TC');
-        </script>
-    """, unsafe_allow_html=True)
+    
+    # Google Analytics (using components.html for proper script execution)
+    GOOGLE_ANALYTICS_CODE = """
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-62K86SX2TC"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-62K86SX2TC');
+    </script>
+    """
+    components.html(GOOGLE_ANALYTICS_CODE, height=0)
 
     # PWA Setup
     st.markdown("""
