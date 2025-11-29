@@ -562,6 +562,57 @@ def main():
         except Exception:
             pass
 
+        # Country Filter
+        st.markdown("""
+            <div style="margin-top: 2rem; margin-bottom: 1rem;">
+                <h3 style="color: #2d3748; font-weight: 600;">
+                    🌍 Filter by Country
+                </h3>
+            </div>
+        """, unsafe_allow_html=True)
+        
+        # Get unique countries from the data
+        if 'Company location (Country)' in df.columns:
+            countries = sorted([c for c in df['Company location (Country)'].dropna().unique() if str(c).strip()])
+            country_options = ['All Countries'] + countries
+            selected_country = st.selectbox(
+                'Select Country',
+                options=country_options,
+                index=0,
+                key='country_filter'
+            )
+            
+            # Apply country filter to dataframe
+            if selected_country != 'All Countries':
+                df_filtered = df[df['Company location (Country)'] == selected_country].copy()
+                st.info(f"Showing data for: **{selected_country}** ({len(df_filtered)} entries)")
+            else:
+                df_filtered = df.copy()
+                st.info(f"Showing data for: **All Countries** ({len(df_filtered)} entries)")
+        else:
+            df_filtered = df.copy()
+            st.warning("Country column not found in data.")
+
+        # Recalculate metrics for filtered data
+        st.markdown("""
+            <div style="margin-top: 2rem; margin-bottom: 1rem;">
+                <h3 style="color: #2d3748; font-weight: 600;">
+                    📊 Filtered Metrics
+                </h3>
+            </div>
+        """, unsafe_allow_html=True)
+        
+        filtered_metrics = st.columns([1, 1, 1])
+        with filtered_metrics[0]:
+            st.metric("Filtered Entries", len(df_filtered))
+        with filtered_metrics[1]:
+            s_filtered = pd.to_numeric(df_filtered.get('Monthly Salary in USD'), errors='coerce')
+            avg_salary_filtered = float(s_filtered.mean()) if s_filtered is not None and len(s_filtered) > 0 else 0.0
+            st.metric("Average Salary (USD)", f"{avg_salary_filtered:,.2f}")
+        with filtered_metrics[2]:
+            unique_roles_filtered = len(df_filtered['Role'].unique()) if len(df_filtered) > 0 else 0
+            st.metric("Unique Roles", unique_roles_filtered)
+
         # Data table with horizontal scroll on mobile (all data from new_salary.csv)
         st.markdown("""
             <div style="margin-top: 2rem; margin-bottom: 1rem;">
@@ -579,7 +630,7 @@ def main():
         try:
             st.markdown('<div class="table-container">', unsafe_allow_html=True)
             # Build display DataFrame and ensure Currency Code is inserted before Monthly Gross Salary
-            display_df = df.copy()
+            display_df = df_filtered.copy()
             if 'Currency Code' not in display_df.columns:
                 # Ensure column exists (may be empty if mapping failed)
                 display_df['Currency Code'] = ''
@@ -629,7 +680,7 @@ def main():
                     </h3>
                 </div>
             """, unsafe_allow_html=True)
-            fig = create_salary_distribution(df)
+            fig = create_salary_distribution(df_filtered)
             st.plotly_chart(fig, use_container_width=True, config={'responsive': True, 'displayModeBar': True})
         except Exception as e:
             st.error(f"Error creating salary distribution chart: {str(e)}")
@@ -642,7 +693,7 @@ def main():
                     </h3>
                 </div>
             """, unsafe_allow_html=True)
-            fig = create_experience_salary_correlation(df)
+            fig = create_experience_salary_correlation(df_filtered)
             st.plotly_chart(fig, use_container_width=True, config={'responsive': True, 'displayModeBar': True})
         except Exception as e:
             st.error(f"Error creating experience correlation chart: {str(e)}")
@@ -655,7 +706,7 @@ def main():
                     </h3>
                 </div>
             """, unsafe_allow_html=True)
-            fig = create_industry_salary_box(df)
+            fig = create_industry_salary_box(df_filtered)
             st.plotly_chart(fig, use_container_width=True, config={'responsive': True, 'displayModeBar': True})
         except Exception as e:
             st.error(f"Error creating industry analysis chart: {str(e)}")
@@ -668,7 +719,7 @@ def main():
                     </h3>
                 </div>
             """, unsafe_allow_html=True)
-            fig = create_degree_distribution(df)
+            fig = create_degree_distribution(df_filtered)
             st.plotly_chart(fig, use_container_width=True, config={'responsive': True, 'displayModeBar': True})
         except Exception as e:
             st.error(f"Error creating degree distribution chart: {str(e)}")
@@ -681,7 +732,7 @@ def main():
                     </h3>
                 </div>
             """, unsafe_allow_html=True)
-            fig = create_top_roles_salary(df)
+            fig = create_top_roles_salary(df_filtered)
             st.plotly_chart(fig, use_container_width=True, config={'responsive': True, 'displayModeBar': True})
         except Exception as e:
             st.error(f"Error creating role analysis chart: {str(e)}")
