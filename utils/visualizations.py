@@ -28,15 +28,40 @@ def create_salary_distribution(df):
         x=col,
         title='Salary Distribution',
         labels={col: label},
-        opacity=0.7
+        opacity=0.8,
+        color_discrete_sequence=['#667eea'],
+        nbins=30
+    )
+    fig.update_traces(
+        marker=dict(
+            line=dict(width=1, color='white'),
+            color='#667eea'
+        ),
+        hovertemplate='<b>Salary Range</b>: %{x:$,.0f}<br>' +
+                      '<b>Count</b>: %{y}<extra></extra>'
     )
     fig.update_layout(
         showlegend=False,
-        height=400,
-        margin=dict(l=10, r=10, t=40, b=20),  # Tighter margins for mobile
-        title_x=0.5,  # Center title
-        xaxis_title_standoff=10,
-        yaxis_title_standoff=10
+        height=450,
+        margin=dict(l=50, r=20, t=60, b=50),
+        title_x=0.5,
+        title_font=dict(size=20, color='#2d3748', family='Inter'),
+        plot_bgcolor='rgba(0,0,0,0)',
+        paper_bgcolor='rgba(0,0,0,0)',
+        xaxis=dict(
+            title_font=dict(size=14, color='#4a5568'),
+            tickfont=dict(size=12, color='#718096'),
+            gridcolor='rgba(0,0,0,0.05)',
+            showgrid=True
+        ),
+        yaxis=dict(
+            title_font=dict(size=14, color='#4a5568'),
+            tickfont=dict(size=12, color='#718096'),
+            gridcolor='rgba(0,0,0,0.05)',
+            showgrid=True
+        ),
+        xaxis_title_standoff=15,
+        yaxis_title_standoff=15
     )
     return fig
 
@@ -45,6 +70,7 @@ def create_experience_salary_correlation(df):
     col, label = _pick_salary_column(df)
     df = df.copy()
     df[col] = pd.to_numeric(df[col], errors='coerce')
+    df['Years of Experience'] = pd.to_numeric(df['Years of Experience'], errors='coerce')
     try:
         # Try to create scatter plot with trend line
         fig = px.scatter(
@@ -56,7 +82,9 @@ def create_experience_salary_correlation(df):
                 'Years of Experience': 'Experience (Years)',
                 col: label
             },
-            trendline="lowess"  # Use lowess instead of ols, more robust
+            trendline="lowess",  # Use lowess instead of ols, more robust
+            color_discrete_sequence=['#764ba2'],
+            opacity=0.6
         )
     except Exception as e:
         # Fallback to basic scatter plot without trend line
@@ -68,15 +96,49 @@ def create_experience_salary_correlation(df):
             labels={
                 'Years of Experience': 'Experience (Years)',
                 col: label
-            }
+            },
+            color_discrete_sequence=['#764ba2'],
+            opacity=0.6
         )
 
+    fig.update_traces(
+        marker=dict(
+            size=8,
+            line=dict(width=1, color='white'),
+            color='#764ba2'
+        ),
+        hovertemplate='<b>Experience</b>: %{x} years<br>' +
+                      '<b>Salary</b>: %{y:$,.0f}<extra></extra>'
+    )
+    
+    # Update trendline color if it exists
+    if len(fig.data) > 1:
+        fig.data[1].update(
+            line=dict(color='#667eea', width=3),
+            name='Trend'
+        )
+    
     fig.update_layout(
-        height=400,
-        margin=dict(l=10, r=10, t=40, b=20),
+        height=450,
+        margin=dict(l=50, r=20, t=60, b=50),
         title_x=0.5,
-        xaxis_title_standoff=10,
-        yaxis_title_standoff=10
+        title_font=dict(size=20, color='#2d3748', family='Inter'),
+        plot_bgcolor='rgba(0,0,0,0)',
+        paper_bgcolor='rgba(0,0,0,0)',
+        xaxis=dict(
+            title_font=dict(size=14, color='#4a5568'),
+            tickfont=dict(size=12, color='#718096'),
+            gridcolor='rgba(0,0,0,0.05)',
+            showgrid=True
+        ),
+        yaxis=dict(
+            title_font=dict(size=14, color='#4a5568'),
+            tickfont=dict(size=12, color='#718096'),
+            gridcolor='rgba(0,0,0,0.05)',
+            showgrid=True
+        ),
+        xaxis_title_standoff=15,
+        yaxis_title_standoff=15
     )
     return fig
 
@@ -96,24 +158,42 @@ def create_industry_salary_box(df):
         x='Industry',
         y=col,
         title='Salary Ranges by Industry',
-        labels={col: label}
+        labels={col: label},
+        color_discrete_sequence=['#667eea']
+    )
+    fig.update_traces(
+        marker=dict(color='#764ba2', size=4),
+        line=dict(color='#667eea', width=2),
+        fillcolor='rgba(102, 126, 234, 0.3)',
+        hovertemplate='<b>Industry</b>: %{x}<br>' +
+                      '<b>Salary</b>: %{y:$,.0f}<extra></extra>'
     )
     fig.update_layout(
-        height=500,
-        margin=dict(l=10, r=10, t=40, b=100),  # More bottom margin for labels
+        height=550,
+        margin=dict(l=50, r=20, t=60, b=120),
         title_x=0.5,
-        xaxis_tickangle=-45,  # Angle the industry labels
+        title_font=dict(size=20, color='#2d3748', family='Inter'),
+        plot_bgcolor='rgba(0,0,0,0)',
+        paper_bgcolor='rgba(0,0,0,0)',
+        xaxis=dict(
+            title_font=dict(size=14, color='#4a5568'),
+            tickfont=dict(size=11, color='#718096'),
+            gridcolor='rgba(0,0,0,0.05)',
+            showgrid=True
+        ),
+        yaxis=dict(
+            title_font=dict(size=14, color='#4a5568'),
+            tickfont=dict(size=12, color='#718096'),
+            gridcolor='rgba(0,0,0,0.05)',
+            showgrid=True
+        ),
+        xaxis_tickangle=-45,
         showlegend=False
     )
     return fig
 
 def create_degree_distribution(df):
-    """Create pie chart of degree distribution with fixed colors.
-
-    Colors:
-    - No  -> red
-    - Yes -> blue
-    """
+    """Create pie chart of degree distribution with modern colors."""
     # Ensure consistent ordering and labels
     degree_counts = df['Degree'].value_counts()
     counts_df = degree_counts.reset_index()
@@ -126,14 +206,36 @@ def create_degree_distribution(df):
         title='Education Level Distribution',
         color='Degree',
         color_discrete_map={
-            'No': 'red',
-            'Yes': 'blue',
+            'No': '#f56565',
+            'Yes': '#667eea',
         },
+        hole=0.4  # Donut chart style
+    )
+    fig.update_traces(
+        textposition='inside',
+        textinfo='percent+label',
+        marker=dict(
+            line=dict(color='white', width=2)
+        ),
+        hovertemplate='<b>%{label}</b><br>' +
+                      'Count: %{value}<br>' +
+                      'Percentage: %{percent}<extra></extra>'
     )
     fig.update_layout(
-        height=400,
-        margin=dict(l=10, r=10, t=40, b=20),
-        title_x=0.5
+        height=450,
+        margin=dict(l=20, r=20, t=60, b=20),
+        title_x=0.5,
+        title_font=dict(size=20, color='#2d3748', family='Inter'),
+        font=dict(size=12, color='#4a5568', family='Inter'),
+        showlegend=True,
+        legend=dict(
+            orientation="v",
+            yanchor="middle",
+            y=0.5,
+            xanchor="left",
+            x=1.05,
+            font=dict(size=12, color='#4a5568')
+        )
     )
     return fig
 
@@ -147,20 +249,52 @@ def create_top_roles_salary(df, top_n=10):
     # Get top N roles by count
     top_roles = role_avg_salary.nlargest(top_n, 'count')
 
+    # Create a DataFrame for the bar chart
+    bar_df = pd.DataFrame({
+        'Role': top_roles.index,
+        'Average Salary': top_roles['mean']
+    })
+    
     fig = px.bar(
-        x=top_roles.index,
-        y=top_roles['mean'],
+        bar_df,
+        x='Role',
+        y='Average Salary',
         title=f'Average Salary by Role (Top {top_n} Most Common)',
         labels={
-            'x': 'Role',
-            'y': f'Average {label}'
-        }
+            'Role': 'Role',
+            'Average Salary': f'Average {label}'
+        },
+        color='Average Salary',
+        color_continuous_scale='Viridis'
+    )
+    fig.update_traces(
+        marker=dict(
+            line=dict(color='white', width=1)
+        ),
+        hovertemplate='<b>%{x}</b><br>' +
+                      '<b>Average Salary</b>: %{y:$,.0f}<extra></extra>'
     )
     fig.update_layout(
-        height=500,
-        margin=dict(l=10, r=10, t=40, b=100),  # More bottom margin for labels
+        height=550,
+        margin=dict(l=50, r=20, t=60, b=120),
         title_x=0.5,
-        xaxis_tickangle=-45,  # Angle the role labels
-        showlegend=False
+        title_font=dict(size=20, color='#2d3748', family='Inter'),
+        plot_bgcolor='rgba(0,0,0,0)',
+        paper_bgcolor='rgba(0,0,0,0)',
+        xaxis=dict(
+            title_font=dict(size=14, color='#4a5568'),
+            tickfont=dict(size=11, color='#718096'),
+            gridcolor='rgba(0,0,0,0.05)',
+            showgrid=False
+        ),
+        yaxis=dict(
+            title_font=dict(size=14, color='#4a5568'),
+            tickfont=dict(size=12, color='#718096'),
+            gridcolor='rgba(0,0,0,0.05)',
+            showgrid=True
+        ),
+        xaxis_tickangle=-45,
+        showlegend=False,
+        coloraxis_showscale=False
     )
     return fig

@@ -77,11 +77,63 @@ def submission_form(save_callback):
         st.markdown("""
             <style>
                 div[data-testid="stForm"] {
-                    padding: 1rem;
-                    border-radius: 10px;
+                    padding: 2rem;
+                    border-radius: 15px;
+                    background: linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%);
+                    border: 1px solid rgba(102, 126, 234, 0.2);
+                    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
                 }
+                
+                div[data-testid="stForm"] label {
+                    font-weight: 600;
+                    color: #2d3748;
+                    margin-bottom: 0.5rem;
+                }
+                
                 div[data-testid="stFormSubmitButton"] {
-                    margin-top: 1rem;
+                    margin-top: 1.5rem;
+                }
+                
+                div[data-testid="stFormSubmitButton"] > button {
+                    width: 100%;
+                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                    color: white;
+                    border: none;
+                    border-radius: 10px;
+                    padding: 0.875rem 2rem;
+                    font-weight: 600;
+                    font-size: 1rem;
+                    transition: all 0.3s ease;
+                    box-shadow: 0 4px 6px rgba(102, 126, 234, 0.3);
+                }
+                
+                div[data-testid="stFormSubmitButton"] > button:hover {
+                    transform: translateY(-2px);
+                    box-shadow: 0 6px 12px rgba(102, 126, 234, 0.4);
+                }
+                
+                .stTextInput > div > div > input,
+                .stNumberInput > div > div > input,
+                .stSelectbox > div > div > select {
+                    border-radius: 10px;
+                    border: 2px solid #e2e8f0;
+                    padding: 0.75rem;
+                    transition: all 0.3s ease;
+                    background: white;
+                }
+                
+                .stTextInput > div > div > input:focus,
+                .stNumberInput > div > div > input:focus,
+                .stSelectbox > div > div > select:focus {
+                    border-color: #667eea;
+                    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+                    outline: none;
+                }
+                
+                .stCaption {
+                    color: #718096;
+                    font-size: 0.85rem;
+                    font-style: italic;
                 }
             </style>
         """, unsafe_allow_html=True)
