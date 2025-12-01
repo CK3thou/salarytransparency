@@ -84,61 +84,249 @@ def main():
         </script>
     """, unsafe_allow_html=True)
 
-    # Mobile-first styles
+    # Modern, visually appealing styles
     st.markdown("""
         <style>
-            /* Mobile-first styles */
-            @media (max-width: 768px) {
-                .main .block-container {
-                    padding: 1rem !important;
-                }
-                .stDataFrame {
-                    font-size: 14px;
-                }
-                .stSelectbox {
-                    max-width: 100% !important;
-                }
-                /* Improve touch targets */
-                .stButton > button {
-                    min-height: 44px;
-                }
-                /* Make charts responsive */
-                .plotly-chart-container {
-                    width: 100% !important;
-                }
+            /* Import modern fonts */
+            @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+            
+            /* Global styling */
+            * {
+                font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
             }
-            /* Hide desktop-only elements on mobile */
-            @media (max-width: 768px) {
-                .desktop-only {
-                    display: none !important;
-                }
+            
+            /* Main container with gradient background */
+            .main {
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                background-attachment: fixed;
+                min-height: 100vh;
             }
-            /* Native-like app styling */
-            body {
-                -webkit-tap-highlight-color: transparent;
-                -webkit-touch-callout: none;
-                -webkit-user-select: none;
-                user-select: none;
+            
+            /* Content container with glassmorphism effect */
+            .main .block-container {
+                background: rgba(255, 255, 255, 0.95);
+                backdrop-filter: blur(10px);
+                border-radius: 20px;
+                padding: 2.5rem !important;
+                box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+                margin-top: 1rem;
+                margin-bottom: 2rem;
             }
+            
+            /* Enhanced title styling */
+            h1 {
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                -webkit-background-clip: text;
+                -webkit-text-fill-color: transparent;
+                background-clip: text;
+                font-weight: 700;
+                font-size: 2.5rem;
+                margin-bottom: 1.5rem;
+                text-align: center;
+            }
+            
+            h2, h3 {
+                color: #2d3748;
+                font-weight: 600;
+                margin-top: 2rem;
+                margin-bottom: 1rem;
+            }
+            
+            /* Modern metric cards */
+            [data-testid="stMetricValue"] {
+                font-size: 2rem;
+                font-weight: 700;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                -webkit-background-clip: text;
+                -webkit-text-fill-color: transparent;
+                background-clip: text;
+            }
+            
+            [data-testid="stMetricLabel"] {
+                font-size: 0.9rem;
+                color: #718096;
+                font-weight: 500;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+            }
+            
+            /* Enhanced metric containers */
+            [data-testid="stMetricContainer"] {
+                background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+                padding: 1.5rem;
+                border-radius: 15px;
+                border: 1px solid rgba(102, 126, 234, 0.2);
+                box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+                transition: transform 0.2s, box-shadow 0.2s;
+            }
+            
+            [data-testid="stMetricContainer"]:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
+            }
+            
+            /* Enhanced buttons */
+            .stButton > button {
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                color: white;
+                border: none;
+                border-radius: 10px;
+                padding: 0.75rem 2rem;
+                font-weight: 600;
+                transition: all 0.3s ease;
+                box-shadow: 0 4px 6px rgba(102, 126, 234, 0.3);
+                min-height: 44px;
+            }
+            
+            .stButton > button:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 6px 12px rgba(102, 126, 234, 0.4);
+            }
+            
+            /* Enhanced form inputs */
+            .stTextInput > div > div > input,
+            .stNumberInput > div > div > input,
+            .stSelectbox > div > div > select {
+                border-radius: 10px;
+                border: 2px solid #e2e8f0;
+                padding: 0.75rem;
+                transition: all 0.3s ease;
+            }
+            
+            .stTextInput > div > div > input:focus,
+            .stNumberInput > div > div > input:focus,
+            .stSelectbox > div > div > select:focus {
+                border-color: #667eea;
+                box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+            }
+            
+            /* Enhanced alerts */
+            .stAlert {
+                border-radius: 12px;
+                border-left: 4px solid;
+                padding: 1rem 1.5rem;
+                box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+            }
+            
+            .stAlert[data-baseweb="notification"] {
+                background: rgba(102, 126, 234, 0.1);
+                border-left-color: #667eea;
+            }
+            
+            /* Enhanced expander */
+            .streamlit-expanderHeader {
+                background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+                border-radius: 10px;
+                padding: 1rem;
+                font-weight: 600;
+                color: #2d3748;
+            }
+            
+            /* Enhanced dataframe */
+            .stDataFrame {
+                border-radius: 12px;
+                overflow: hidden;
+                box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            }
+            
             /* Table container for mobile */
             .table-container {
                 overflow-x: auto;
                 -webkit-overflow-scrolling: touch;
                 margin: 1rem -1rem;
                 padding: 0 1rem;
+                border-radius: 12px;
             }
-            /* Alert and exception tweaks */
-            .stAlert { border-radius: 8px; }
-            .stException { font-size: 0.9em; overflow-x: auto; white-space: pre-wrap; }
+            
+            /* Mobile-first responsive styles */
+            @media (max-width: 768px) {
+                .main .block-container {
+                    padding: 1.5rem !important;
+                    border-radius: 15px;
+                }
+                
+                h1 {
+                    font-size: 2rem;
+                }
+                
+                .stDataFrame {
+                    font-size: 14px;
+                }
+                
+                .stSelectbox {
+                    max-width: 100% !important;
+                }
+                
+                [data-testid="stMetricValue"] {
+                    font-size: 1.5rem;
+                }
+                
+                [data-testid="stMetricContainer"] {
+                    padding: 1rem;
+                }
+            }
+            
+            /* Hide desktop-only elements on mobile */
+            @media (max-width: 768px) {
+                .desktop-only {
+                    display: none !important;
+                }
+            }
+            
+            /* Native-like app styling */
+            body {
+                -webkit-tap-highlight-color: transparent;
+                -webkit-touch-callout: none;
+            }
+            
             /* Smooth scrolling */
             .main {
                 scroll-behavior: smooth;
                 -webkit-overflow-scrolling: touch;
             }
+            
+            /* Enhanced exception display */
+            .stException {
+                font-size: 0.9em;
+                overflow-x: auto;
+                white-space: pre-wrap;
+                border-radius: 8px;
+                padding: 1rem;
+                background: #fee;
+            }
+            
+            /* Caption styling */
+            .stCaption {
+                color: #718096;
+                font-size: 0.85rem;
+            }
+            
+            /* Subheader styling */
+            .stSubheader {
+                color: #2d3748;
+                font-weight: 600;
+                margin-top: 2rem;
+            }
         </style>
     """, unsafe_allow_html=True)
 
-    st.title("Salary Transparency Platform")
+    # Hero section with enhanced title
+    st.markdown("""
+        <div style="text-align: center; margin-bottom: 2rem;">
+            <h1 style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                       -webkit-background-clip: text;
+                       -webkit-text-fill-color: transparent;
+                       background-clip: text;
+                       font-weight: 700;
+                       font-size: 3rem;
+                       margin-bottom: 0.5rem;">
+                💰 Salary Transparency Platform
+            </h1>
+            <p style="color: #718096; font-size: 1.1rem; margin-top: 0;">
+                Empowering transparency through data sharing
+            </p>
+        </div>
+    """, unsafe_allow_html=True)
 
     @st.cache_data(show_spinner=False)
     def load_currency_map():
@@ -343,8 +531,14 @@ def main():
         st.exception(e)
         df = pd.DataFrame()
 
-    # Main content
-    st.subheader("Submissions")
+    # Main content with enhanced styling
+    st.markdown("""
+        <div style="margin-top: 2rem; margin-bottom: 1rem;">
+            <h2 style="color: #2d3748; font-weight: 600; border-bottom: 3px solid #667eea; padding-bottom: 0.5rem;">
+                📊 Submissions Overview
+            </h2>
+        </div>
+    """, unsafe_allow_html=True)
 
     if not df.empty:
         # Responsive metrics layout
@@ -368,8 +562,65 @@ def main():
         except Exception:
             pass
 
+        # Country Filter
+        st.markdown("""
+            <div style="margin-top: 2rem; margin-bottom: 1rem;">
+                <h3 style="color: #2d3748; font-weight: 600;">
+                    🌍 Filter by Country
+                </h3>
+            </div>
+        """, unsafe_allow_html=True)
+        
+        # Get unique countries from the data
+        if 'Company location (Country)' in df.columns:
+            countries = sorted([c for c in df['Company location (Country)'].dropna().unique() if str(c).strip()])
+            country_options = ['All Countries'] + countries
+            selected_country = st.selectbox(
+                'Select Country',
+                options=country_options,
+                index=0,
+                key='country_filter'
+            )
+            
+            # Apply country filter to dataframe
+            if selected_country != 'All Countries':
+                df_filtered = df[df['Company location (Country)'] == selected_country].copy()
+                st.info(f"Showing data for: **{selected_country}** ({len(df_filtered)} entries)")
+            else:
+                df_filtered = df.copy()
+                st.info(f"Showing data for: **All Countries** ({len(df_filtered)} entries)")
+        else:
+            df_filtered = df.copy()
+            st.warning("Country column not found in data.")
+
+        # Recalculate metrics for filtered data
+        st.markdown("""
+            <div style="margin-top: 2rem; margin-bottom: 1rem;">
+                <h3 style="color: #2d3748; font-weight: 600;">
+                    📊 Filtered Metrics
+                </h3>
+            </div>
+        """, unsafe_allow_html=True)
+        
+        filtered_metrics = st.columns([1, 1, 1])
+        with filtered_metrics[0]:
+            st.metric("Filtered Entries", len(df_filtered))
+        with filtered_metrics[1]:
+            s_filtered = pd.to_numeric(df_filtered.get('Monthly Salary in USD'), errors='coerce')
+            avg_salary_filtered = float(s_filtered.mean()) if s_filtered is not None and len(s_filtered) > 0 else 0.0
+            st.metric("Average Salary (USD)", f"{avg_salary_filtered:,.2f}")
+        with filtered_metrics[2]:
+            unique_roles_filtered = len(df_filtered['Role'].unique()) if len(df_filtered) > 0 else 0
+            st.metric("Unique Roles", unique_roles_filtered)
+
         # Data table with horizontal scroll on mobile (all data from new_salary.csv)
-        st.subheader("All Data")
+        st.markdown("""
+            <div style="margin-top: 2rem; margin-bottom: 1rem;">
+                <h2 style="color: #2d3748; font-weight: 600; border-bottom: 3px solid #667eea; padding-bottom: 0.5rem;">
+                    📋 All Data
+                </h2>
+            </div>
+        """, unsafe_allow_html=True)
         # Hint if FX-derived USD values are missing
         try:
             if 'Monthly Salary in USD' not in df.columns or pd.to_numeric(df.get('Monthly Salary in USD'), errors='coerce').notna().sum() == 0:
@@ -379,7 +630,7 @@ def main():
         try:
             st.markdown('<div class="table-container">', unsafe_allow_html=True)
             # Build display DataFrame and ensure Currency Code is inserted before Monthly Gross Salary
-            display_df = df.copy()
+            display_df = df_filtered.copy()
             if 'Currency Code' not in display_df.columns:
                 # Ensure column exists (may be empty if mapping failed)
                 display_df['Currency Code'] = ''
@@ -414,46 +665,89 @@ def main():
             st.exception(e)
 
         # Recommended visualizations (rendered below the table)
-        st.subheader("Visualizations")
+        st.markdown("""
+            <div style="margin-top: 3rem; margin-bottom: 1.5rem;">
+                <h2 style="color: #2d3748; font-weight: 600; border-bottom: 3px solid #667eea; padding-bottom: 0.5rem;">
+                    📈 Visualizations
+                </h2>
+            </div>
+        """, unsafe_allow_html=True)
         try:
-            st.markdown("### Salary Distribution")
-            fig = create_salary_distribution(df)
-            st.plotly_chart(fig, width='stretch', config={'responsive': True})
+            st.markdown("""
+                <div style="margin-top: 2rem; margin-bottom: 1rem;">
+                    <h3 style="color: #4a5568; font-weight: 600; font-size: 1.3rem;">
+                        📊 Salary Distribution
+                    </h3>
+                </div>
+            """, unsafe_allow_html=True)
+            fig = create_salary_distribution(df_filtered)
+            st.plotly_chart(fig, use_container_width=True, config={'responsive': True, 'displayModeBar': True})
         except Exception as e:
             st.error(f"Error creating salary distribution chart: {str(e)}")
 
         try:
-            st.markdown("### Experience vs Salary")
-            fig = create_experience_salary_correlation(df)
-            st.plotly_chart(fig, width='stretch', config={'responsive': True})
+            st.markdown("""
+                <div style="margin-top: 2rem; margin-bottom: 1rem;">
+                    <h3 style="color: #4a5568; font-weight: 600; font-size: 1.3rem;">
+                        📈 Experience vs Salary
+                    </h3>
+                </div>
+            """, unsafe_allow_html=True)
+            fig = create_experience_salary_correlation(df_filtered)
+            st.plotly_chart(fig, use_container_width=True, config={'responsive': True, 'displayModeBar': True})
         except Exception as e:
             st.error(f"Error creating experience correlation chart: {str(e)}")
 
         try:
-            st.markdown("### Industry Salary Spread")
-            fig = create_industry_salary_box(df)
-            st.plotly_chart(fig, width='stretch', config={'responsive': True})
+            st.markdown("""
+                <div style="margin-top: 2rem; margin-bottom: 1rem;">
+                    <h3 style="color: #4a5568; font-weight: 600; font-size: 1.3rem;">
+                        🏢 Industry Salary Spread
+                    </h3>
+                </div>
+            """, unsafe_allow_html=True)
+            fig = create_industry_salary_box(df_filtered)
+            st.plotly_chart(fig, use_container_width=True, config={'responsive': True, 'displayModeBar': True})
         except Exception as e:
             st.error(f"Error creating industry analysis chart: {str(e)}")
 
         try:
-            st.markdown("### Salary by Degree")
-            fig = create_degree_distribution(df)
-            st.plotly_chart(fig, width='stretch', config={'responsive': True})
+            st.markdown("""
+                <div style="margin-top: 2rem; margin-bottom: 1rem;">
+                    <h3 style="color: #4a5568; font-weight: 600; font-size: 1.3rem;">
+                        🎓 Salary by Degree
+                    </h3>
+                </div>
+            """, unsafe_allow_html=True)
+            fig = create_degree_distribution(df_filtered)
+            st.plotly_chart(fig, use_container_width=True, config={'responsive': True, 'displayModeBar': True})
         except Exception as e:
             st.error(f"Error creating degree distribution chart: {str(e)}")
 
         try:
-            st.markdown("### Top Roles by Salary")
-            fig = create_top_roles_salary(df)
-            st.plotly_chart(fig, width='stretch', config={'responsive': True})
+            st.markdown("""
+                <div style="margin-top: 2rem; margin-bottom: 1rem;">
+                    <h3 style="color: #4a5568; font-weight: 600; font-size: 1.3rem;">
+                        💼 Top Roles by Salary
+                    </h3>
+                </div>
+            """, unsafe_allow_html=True)
+            fig = create_top_roles_salary(df_filtered)
+            st.plotly_chart(fig, use_container_width=True, config={'responsive': True, 'displayModeBar': True})
         except Exception as e:
             st.error(f"Error creating role analysis chart: {str(e)}")
     else:
         st.info("No salary data available yet. Be the first to contribute!")
 
-    # Mobile-friendly submission form
-    with st.expander("Submit Your Salary Data", expanded=False):
+    # Mobile-friendly submission form with enhanced styling
+    st.markdown("""
+        <div style="margin-top: 3rem; margin-bottom: 1rem;">
+            <h2 style="color: #2d3748; font-weight: 600; border-bottom: 3px solid #667eea; padding-bottom: 0.5rem;">
+                ✍️ Submit Your Salary Data
+            </h2>
+        </div>
+    """, unsafe_allow_html=True)
+    with st.expander("📝 Open Submission Form", expanded=False):
         submission_form(save_submission)
 
     # Sidebar removed per request
