@@ -1,39 +1,36 @@
-import os
 import sys
-import pandas as pd
+from pathlib import Path
+import sqlite3
 
-PATH = os.path.join(os.path.dirname(__file__), '..', 'data', 'new_salary.csv')
-PATH = os.path.abspath(PATH)
+# Add project root to path to allow imports
+sys.path.append(str(Path(__file__).resolve().parents[1]))
+
+from utils.db_setup import get_db_connection
 
 def main():
-    if not os.path.exists(PATH):
-        print(f'ERROR: file not found: {PATH}')
-        return 1
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
     try:
-        df = pd.read_csv(PATH)
+        # Normalize 'yes' (case insensitive) to 'Yes'
+        cursor.execute("UPDATE salary_entries SET degree = 'Yes' WHERE TRIM(LOWER(degree)) = 'yes' AND degree != 'Yes'")
+        changed = cursor.rowcount
+        
+        conn.commit()
+        print(f'Normalized Degree -> Yes: {changed} rows updated')
+        
+        # Show unique values
+        cursor.execute("SELECT DISTINCT degree FROM salary_entries ORDER BY degree")
+        uniques = [row[0] for row in cursor.fetchall()]
+        print('Unique Degree values after:', uniques)
+        
     except Exception as e:
-        print('ERROR: failed to read CSV:', e)
-        return 2
-
-    if 'Degree' not in df.columns:
-        print('No Degree column found; no changes made.')
-        return 0
-
-    s = df['Degree']
-    mask = s.astype(str).str.strip().str.lower().eq('yes')
-    changed = int(mask.sum())
-    if changed:
-        df.loc[mask, 'Degree'] = 'Yes'
-        try:
-            df.to_csv(PATH, index=False)
-        except Exception as e:
-            print('ERROR: failed to write CSV:', e)
-            return 3
-
-    print(f'Normalized Degree -> Yes: {changed} rows updated')
-    uniques = sorted(pd.unique(df['Degree'].astype(str)))
-    print('Unique Degree values after:', uniques)
+        print(f"Error normalizing degrees: {e}")
+        return 1
+    finally:
+        conn.close()
+        
     return 0
 
 if __name__ == '__main__':
-    raise SystemExit(main())
+    sys.exit(main())

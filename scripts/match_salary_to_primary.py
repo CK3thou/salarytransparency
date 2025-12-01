@@ -1,64 +1,40 @@
-import os
 import sys
 from pathlib import Path
-import pandas as pd
+import sqlite3
 
-ROOT = Path(__file__).resolve().parents[1]
-CSV_PATH = ROOT / 'data' / 'new_salary.csv'
+# Add project root to path to allow imports
+sys.path.append(str(Path(__file__).resolve().parents[1]))
 
+from utils.db_setup import get_db_connection
 
-def main() -> int:
-    if not CSV_PATH.exists():
-        print(f'ERROR: CSV not found: {CSV_PATH}')
+def main():
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    try:
+        # Backfill monthly_gross_salary from salary_gross_in_usd if missing
+        # Note: This assumes 1:1 if no FX rate is applied, or just copies it as a fallback.
+        # The original script copied USD as-is to avoid FX dependencies.
+        
+        cursor.execute("""
+            UPDATE salary_entries 
+            SET monthly_gross_salary = salary_gross_in_usd 
+            WHERE (monthly_gross_salary IS NULL OR monthly_gross_salary = '' OR monthly_gross_salary = 0) 
+            AND salary_gross_in_usd IS NOT NULL 
+            AND salary_gross_in_usd != ''
+        """)
+        copied_count = cursor.rowcount
+        
+        conn.commit()
+        print(f'Copied USD to Monthly Gross Salary (where missing): {copied_count} rows updated')
+        
+    except Exception as e:
+        print(f"Error matching salaries: {e}")
         return 1
-
-    df = pd.read_csv(CSV_PATH, dtype=str, keep_default_na=False)
-
-    # Ensure canonical column exists
-    if 'Monthly Gross Salary' not in df.columns:
-        # Try to map legacy names
-        for legacy in ['Monthly Gross Salary (in ZMW)', 'Monthly Gross Salary ZMW', 'Monthly Salary (ZMW)']:
-            if legacy in df.columns:
-                df['Monthly Gross Salary'] = df[legacy]
-                break
-        else:
-            df['Monthly Gross Salary'] = ''
-
-    # Counts
-    filled_from_legacy = 0
-    converted_from_usd = 0
-    usd_copied_no_fx = 0
-
-    # Fill from legacy if any exists
-    for legacy in ['Monthly Gross Salary (in ZMW)', 'Monthly Gross Salary ZMW', 'Monthly Salary (ZMW)']:
-        if legacy in df.columns:
-            mask = df['Monthly Gross Salary'].astype(str).str.strip().eq('') & df[legacy].astype(str).str.strip().ne('')
-            if mask.any():
-                df.loc[mask, 'Monthly Gross Salary'] = df.loc[mask, legacy]
-                filled_from_legacy += int(mask.sum())
-
-    # Convert from USD if ZMW missing and USD present
-    if 'Salary Gross in USD' in df.columns:
-        usd_series = pd.to_numeric(df['Salary Gross in USD'], errors='coerce')
-        mask = df['Monthly Gross Salary'].astype(str).str.strip().eq('') & usd_series.notna()
-        if mask.any():
-            # Do not perform FX here; the app derives USD at runtime.
-            # For backfill, copy USD as-is to avoid introducing FX dependencies.
-            df.loc[mask, 'Monthly Gross Salary'] = usd_series[mask].round(2).astype(str)
-            usd_copied_no_fx = int(mask.sum())
-
-    # Write back
-    df.to_csv(CSV_PATH, index=False, encoding='utf-8')
-
-    print('Updated CSV:', CSV_PATH)
-    print('Filled from legacy columns:', filled_from_legacy)
-    print('Converted from USD (with FX):', converted_from_usd)
-    print('Copied USD without FX (no conversion):', usd_copied_no_fx)
-    # Show a tiny preview
-    cols = [c for c in ['Role', 'Monthly Gross Salary', 'Salary Gross in USD', 'Submission Date'] if c in df.columns]
-    print(df[cols].head(8).to_string(index=False))
+    finally:
+        conn.close()
+        
     return 0
 
-
 if __name__ == '__main__':
-    raise SystemExit(main())
+    sys.exit(main())

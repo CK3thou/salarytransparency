@@ -1,91 +1,18 @@
 from pathlib import Path
 import os
-# Get the project root directory (parent of utils directory)
-_project_root = Path(__file__).parent.parent
-# CSV containing industries for dropdowns
-INDUSTRIES_CSV = _project_root / "data" / "Industries.csv"
-
-def get_industries() -> list:
-    """
-    Return a sorted list of industries from the Industries CSV.
-    Falls back to an empty list if the file isn't present or cannot be read.
-    """
-    try:
-        if not INDUSTRIES_CSV.exists():
-            return []
-        import pandas as pd
-        df = pd.read_csv(INDUSTRIES_CSV, dtype=str, keep_default_na=False)
-        if df.empty:
-            return []
-        # Prefer a column named 'Industry' but fall back to the first column
-        if 'Industry' in df.columns:
-            series = df['Industry']
-        else:
-            series = df.iloc[:, 0]
-        # Normalize entries: strip whitespace and quotes, remove empties
-        inds = series.astype(str).str.strip().str.strip('"').tolist()
-        inds = [i for i in inds if i and i.lower() not in ('nan', 'none', 'industry')]
-        unique_sorted = sorted(set(inds))
-        return unique_sorted
-    except Exception:
-        return []
-# CSV containing nationalities for dropdowns
-NATIONALITIES_CSV = _project_root / "data" / "Nationalities.csv"
-
-def get_nationalities() -> list:
-    """
-    Return a sorted list of nationalities from the Nationalities CSV.
-    Falls back to an empty list if the file isn't present or cannot be read.
-    """
-    try:
-        if not NATIONALITIES_CSV.exists():
-            return []
-        import pandas as pd
-        df = pd.read_csv(NATIONALITIES_CSV, dtype=str, keep_default_na=False)
-        if df.empty:
-            return []
-        # Prefer a column named 'Nationality' but fall back to the first column
-        if 'Nationality' in df.columns:
-            series = df['Nationality']
-        else:
-            series = df.iloc[:, 0]
-        # Normalize entries: strip whitespace and quotes, remove empties
-        nats = series.astype(str).str.strip().str.strip('"').tolist()
-        nats = [n for n in nats if n and n.lower() not in ('nan', 'none')]
-        unique_sorted = sorted(set(nats))
-        return unique_sorted
-    except Exception:
-        return []
-import csv
-import threading
 import pandas as pd
 from datetime import datetime
 import sys
 import random
-from datetime import timedelta
-
-# Cross-platform file locking (fcntl only works on Unix)
-# On Windows, we rely on threading.Lock for synchronization
-if sys.platform == 'win32':
-    # Windows: use no-op locking (threading lock provides synchronization)
-    def lock_file(f):
-        pass
-    def unlock_file(f):
-        pass
-else:
-    # Unix/Linux: use fcntl for file-level locking
-    import fcntl
-    def lock_file(f):
-        fcntl.flock(f.fileno(), fcntl.LOCK_EX)
-    def unlock_file(f):
-        fcntl.flock(f.fileno(), fcntl.LOCK_UN)
+from utils.db_setup import get_db_connection, init_db
 
 # Get the project root directory (parent of utils directory)
 _project_root = Path(__file__).parent.parent
 
-# New CSV file that will be the primary storage for all new submissions
-NEW_CSV = _project_root / "data" / "new_salary.csv"
-
+# CSV containing industries for dropdowns
+INDUSTRIES_CSV = _project_root / "data" / "Industries.csv"
+# CSV containing nationalities for dropdowns
+NATIONALITIES_CSV = _project_root / "data" / "Nationalities.csv"
 # CSV containing world cities/locations used for dropdowns
 WORLD_CITIES_CSV = _project_root / "data" / "worldcities.csv"
 
@@ -105,290 +32,53 @@ CANONICAL_COLUMNS = [
     "Real-time USD ZMW exchange rate"
 ]
 
-_lock = threading.Lock()
-
-def _ensure_csv_exists(path: Path):
-    path.parent.mkdir(parents=True, exist_ok=True)
-    if not path.exists():
-        with path.open("w", newline="", encoding="utf-8") as f:
-            writer = csv.writer(f)
-            writer.writerow(CANONICAL_COLUMNS)
-
-def _map_columns(df: pd.DataFrame) -> pd.DataFrame:
-    col_map = {
-        "Company location": "Company location",
-    "Monthly Gross Salary ZMW": "Monthly Gross Salary",
-    "Monthly Gross Salary (in ZMW)": "Monthly Gross Salary",
-    "Monthly Salary (ZMW)": "Monthly Gross Salary",
-    "Monthly Gross Salary": "Monthly Gross Salary",
-        "Salary Gross in USD (leave blank if you get paid in ZMW)": "Salary Gross in USD",
-        "Salary Gross in USD": "Salary Gross in USD",
-        "Years of Experience": "Years of Experience",
-        "Degree (or not)": "Degree",
-        "Degree": "Degree",
-        "Approx. No. of employees in company": "Approx. No. of employees in company",
-        "Your Country/ Location": "Your Country/ Location",
-        "Nationality": "Nationality",
-        "Industry": "Industry",
-        "Real-time USD ZMW exchange rate": "Real-time USD ZMW exchange rate",
-        "Submission Date": "Submission Date",
-        "Role": "Role",
-        "role": "Role"
-    }
-    new_cols = {}
-    for c in df.columns:
-        mapped = col_map.get(c, None)
-        if mapped:
-            new_cols[c] = mapped
-        else:
-            new_cols[c] = c
-    df = df.rename(columns=new_cols)
-    for col in CANONICAL_COLUMNS:
-        if col not in df.columns:
-            df[col] = ""
-    # Ensure compatibility column for display
-    if "Company location" in df.columns and "Company location (Country)" not in df.columns:
-        df["Company location (Country)"] = df["Company location"]
-    # If both exist but "Company location (Country)" is empty, fill from "Company location"
-    if "Company location (Country)" in df.columns and "Company location" in df.columns:
-        df["Company location (Country)"] = df["Company location (Country)"].replace("", pd.NA).fillna(df["Company location"])
-        # Ensure Company location canonical exists: if missing but (Country) exists, copy from it
-        if "Company location" not in df.columns and "Company location (Country)" in df.columns:
-            df["Company location"] = df["Company location (Country)"]
-        # Ensure compatibility column for display
-        if "Company location" in df.columns and "Company location (Country)" not in df.columns:
-            df["Company location (Country)"] = df["Company location"]
-        # If both exist but "Company location (Country)" is empty, fill from "Company location"
-        if "Company location (Country)" in df.columns and "Company location" in df.columns:
-            df["Company location (Country)"] = df["Company location (Country)"].replace("", pd.NA).fillna(df["Company location"])
-    df = df[CANONICAL_COLUMNS]
-    return df
-
-def _read_csv_safe(path: Path) -> pd.DataFrame:
-    if not path.exists():
-        return pd.DataFrame(columns=CANONICAL_COLUMNS)
+def get_industries() -> list:
+    """
+    Return a sorted list of industries from the Industries CSV.
+    Falls back to an empty list if the file isn't present or cannot be read.
+    """
     try:
-        df = pd.read_csv(path, dtype=str, keep_default_na=False)
+        if not INDUSTRIES_CSV.exists():
+            return []
+        df = pd.read_csv(INDUSTRIES_CSV, dtype=str, keep_default_na=False)
         if df.empty:
-            return pd.DataFrame(columns=CANONICAL_COLUMNS)
-        df = _map_columns(df)
-        # Trim whitespace across all string cells
-        for c in df.columns:
-            if df[c].dtype == object:
-                df[c] = df[c].astype(str).str.strip().str.strip('"')
-        # If reading NEW_CSV, backfill missing Submission Date with random ISO dates in 2023-08-03..2023-12-31
-        if path == NEW_CSV and "Submission Date" in df.columns:
-            sub_raw = df["Submission Date"].astype(str).str.strip()
-            missing_mask = sub_raw.eq("") | sub_raw.str.lower().isin(["nan", "none", "nat"])
-            if missing_mask.any():
-                start_dt = pd.Timestamp(2023, 8, 3)
-                end_dt = pd.Timestamp(2023, 12, 31)
-                total_days = (end_dt - start_dt).days
-                rand_days = [random.randint(0, total_days) for _ in range(int(missing_mask.sum()))]
-                backfill_dates = [(start_dt + pd.Timedelta(days=d)).strftime("%Y-%m-%d") for d in rand_days]
-                df.loc[missing_mask, "Submission Date"] = backfill_dates
-        # Normalize specific columns for display consistency
-        if "Degree" in df.columns:
-            df["Degree"] = df["Degree"].str.strip().str.title().replace({"Yes": "Yes", "No": "No"})
-        if "Nationality" in df.columns:
-            nat = df["Nationality"].str.strip().str.title()
-            # Common correction: country name 'Zambia' to demonym 'Zambian'
-            df["Nationality"] = nat.replace({"Zambia": "Zambian"})
-        if "Your Country/ Location" in df.columns:
-            df["Your Country/ Location"] = df["Your Country/ Location"].str.strip()
-        if "Company location" in df.columns:
-            df["Company location"] = df["Company location"].str.strip()
-        if "Industry" in df.columns:
-            # Normalize simple industry casing and fix common typos
-            df["Industry"] = df["Industry"].astype(str).str.strip()
-            df["Industry"] = df["Industry"].replace({
-                "FCMG": "FMCG",
-                "FINANCE": "Finance",
-                "banking": "Banking",
-            })
-            df["Industry"] = df["Industry"].str.title()
-        # Ensure compatibility column used elsewhere
-        if "Company location" in df.columns and "Company location (Country)" not in df.columns:
-            df["Company location (Country)"] = df["Company location"]
-        # normalize numeric fields
-        df["Monthly Gross Salary"] = pd.to_numeric(df["Monthly Gross Salary"], errors="coerce")
-        df["Salary Gross in USD"] = pd.to_numeric(df["Salary Gross in USD"], errors="coerce")
-        # parse submission date safely (treat day-first format for NEW_CSV)
-        dayfirst = (path == NEW_CSV)
-        dates = pd.to_datetime(df["Submission Date"], errors="coerce", dayfirst=dayfirst)
-        try:
-            dates = dates.infer_objects(copy=False)
-        except Exception:
-            pass
-        dates = dates.fillna(pd.Timestamp.utcnow())
-        df["Submission Date"] = dates.astype("datetime64[ns]")
-        # Persist cleaned NEW_CSV back to disk so dataset stays fixed on disk.
-        # This write can fail on Windows if another process has the file open; don't abort load on failure.
-        if path == NEW_CSV:
-            try:
-                df_to_write = df.copy()
-                # Ensure dates are written as day-first dd/mm/YYYY
-                df_to_write["Submission Date"] = pd.to_datetime(
-                    df_to_write["Submission Date"], errors="coerce", dayfirst=True
-                ).dt.strftime("%d/%m/%Y")
-                with _lock:
-                    df_to_write.to_csv(path, index=False, encoding="utf-8")
-            except Exception:
-                # Non-fatal: keep using the in-memory cleaned DataFrame
-                pass
-        return df
-    except Exception as e:
-        # Graceful fallback: return a minimally cleaned CSV instead of empty
-        try:
-            fallback = pd.read_csv(path, dtype=str, keep_default_na=False)
-            fallback = _map_columns(fallback)
-            # Trim strings
-            for c in fallback.columns:
-                if fallback[c].dtype == object:
-                    fallback[c] = fallback[c].astype(str).str.strip().str.strip('"')
-            # Minimal normalizations
-            if "Degree" in fallback.columns:
-                fallback["Degree"] = fallback["Degree"].str.strip().str.title().replace({"Yes": "Yes", "No": "No"})
-            if "Nationality" in fallback.columns:
-                nat = fallback["Nationality"].str.strip().str.title()
-                fallback["Nationality"] = nat.replace({"Zambia": "Zambian"})
-            if "Industry" in fallback.columns:
-                fallback["Industry"] = fallback["Industry"].astype(str).str.strip()
-                fallback["Industry"] = fallback["Industry"].replace({
-                    "FCMG": "FMCG",
-                    "FINANCE": "Finance",
-                    "banking": "Banking",
-                }).str.title()
-            # Numeric coercion
-            if "Monthly Gross Salary" in fallback.columns:
-                fallback["Monthly Gross Salary"] = pd.to_numeric(fallback["Monthly Gross Salary"], errors="coerce")
-            if "Salary Gross in USD" in fallback.columns:
-                fallback["Salary Gross in USD"] = pd.to_numeric(fallback["Salary Gross in USD"], errors="coerce")
-            if "Years of Experience" in fallback.columns:
-                fallback["Years of Experience"] = pd.to_numeric(fallback["Years of Experience"], errors="coerce")
-            # Dates (day-first for this CSV)
-            if "Submission Date" in fallback.columns:
-                dates = pd.to_datetime(fallback["Submission Date"], errors="coerce", dayfirst=True)
-                dates = dates.fillna(pd.Timestamp.utcnow())
-                fallback["Submission Date"] = dates.astype("datetime64[ns]")
-            # Compatibility column
-            if "Company location" in fallback.columns and "Company location (Country)" not in fallback.columns:
-                fallback["Company location (Country)"] = fallback["Company location"]
-            return fallback
-        except Exception:
-            return pd.DataFrame(columns=CANONICAL_COLUMNS)
+            return []
+        # Prefer a column named 'Industry' but fall back to the first column
+        if 'Industry' in df.columns:
+            series = df['Industry']
+        else:
+            series = df.iloc[:, 0]
+        # Normalize entries: strip whitespace and quotes, remove empties
+        inds = series.astype(str).str.strip().str.strip('"').tolist()
+        inds = [i for i in inds if i and i.lower() not in ('nan', 'none', 'industry')]
+        unique_sorted = sorted(set(inds))
+        return unique_sorted
+    except Exception:
+        return []
 
-def load_data() -> pd.DataFrame:
+def get_nationalities() -> list:
     """
-    Load all data from the single source of truth (new_salary.csv) and return a
-    normalized DataFrame.
-    """
-    # ensure new file exists (header) so save_submission can append later
-    _ensure_csv_exists(NEW_CSV)
-    df = _read_csv_safe(NEW_CSV)
-    if df.empty:
-        # Last-chance tolerant read to avoid empty UI if normalization failed silently
-        try:
-            raw = pd.read_csv(NEW_CSV, dtype=str, keep_default_na=False)
-            raw = _map_columns(raw)
-            # minimal coercions for UI
-            if "Monthly Gross Salary" in raw.columns:
-                raw["Monthly Gross Salary"] = pd.to_numeric(raw["Monthly Gross Salary"], errors="coerce")
-            if "Salary Gross in USD" in raw.columns:
-                raw["Salary Gross in USD"] = pd.to_numeric(raw["Salary Gross in USD"], errors="coerce")
-            if "Submission Date" in raw.columns:
-                raw["Submission Date"] = pd.to_datetime(raw["Submission Date"], errors="coerce", dayfirst=True)
-            df = raw
-        except Exception:
-            return pd.DataFrame(columns=CANONICAL_COLUMNS)
-    # keep canonical columns and compatibility name expected by filters
-    if "Company location" in df.columns and "Company location (Country)" not in df.columns:
-        df["Company location (Country)"] = df["Company location"]
-    return df
-
-def save_submission(record: dict):
-    """
-    Append a single submission to NEW_CSV. This file is the primary storage for new entries.
-    Uses an exclusive file lock to avoid concurrent write corruption.
-    Returns True on success, False on failure.
+    Return a sorted list of nationalities from the Nationalities CSV.
+    Falls back to an empty list if the file isn't present or cannot be read.
     """
     try:
-        _ensure_csv_exists(NEW_CSV)
-
-        mapping_preferences = {
-        "Role": ["Role", "role"],
-        "Company location": ["Company location", "company_location", "Company location (Country)"],
-        "Monthly Gross Salary": [
-            "Monthly Gross Salary",
-            "monthly_gross_salary_zmw",
-            "Monthly Salary (ZMW)"
-        ],
-        "Salary Gross in USD": ["Salary Gross in USD", "Salary Gross in USD (leave blank if you get paid in ZMW)", "salary_gross_usd"],
-        "Years of Experience": ["Years of Experience", "years_of_experience"],
-        "Degree": ["Degree", "Degree (or not)", "degree"],
-        "Approx. No. of employees in company": ["Approx. No. of employees in company", "approx_no_of_employees"],
-        "Your Country/ Location": ["Your Country/ Location", "country_location"],
-        "Nationality": ["Nationality", "nationality"],
-        "Industry": ["Industry", "industry"],
-        "Submission Date": ["Submission Date", "submission_date"],
-        "Real-time USD ZMW exchange rate": ["Real-time USD ZMW exchange rate", "realtime_usd_zmw_rate"]
-        }
-
-        # Build a canonical row
-        row = {}
-        for canonical, keys in mapping_preferences.items():
-            val = None
-            for k in keys:
-                if k in record and record.get(k) not in (None, ""):
-                    val = record.get(k)
-                    break
-            # Default date if missing (store as dd/mm/YYYY, no time)
-            if canonical == "Submission Date":
-                if not val:
-                    val = datetime.now().strftime("%d/%m/%Y")
-                else:
-                    # Coerce any provided value into dd/mm/YYYY
-                    try:
-                        val = pd.to_datetime(str(val), dayfirst=True, errors="coerce").strftime("%d/%m/%Y")
-                    except Exception:
-                        # If parsing fails, fall back to current date
-                        val = datetime.now().strftime("%d/%m/%Y")
-
-            # Normalize scalars to strings for CSV
-            if canonical in ("Monthly Gross Salary", "Salary Gross in USD", "Years of Experience") and val not in (None, ""):
-                try:
-                    # keep numeric but ensure no thousands separators, then cast back to string for CSV
-                    num = float(val)
-                    if canonical == "Years of Experience":
-                        num = int(num)
-                    val = str(num)
-                except Exception:
-                    # leave as-is; downstream reader will coerce
-                    pass
-
-            row[canonical] = "" if val is None else val
-
-        # append to NEW_CSV with file lock
-        with _lock:
-            with open(NEW_CSV, "a+", newline="", encoding="utf-8") as f:
-                try:
-                    lock_file(f)
-                    f.seek(0)
-                    content = f.read(1)
-                    writer = csv.DictWriter(f, fieldnames=CANONICAL_COLUMNS)
-                    if not content:
-                        f.seek(0)
-                        writer.writeheader()
-                    f.seek(0, 2)
-                    writer.writerow(row)
-                finally:
-                    unlock_file(f)
-        return True
-    except Exception as e:
-        # Basic logging to console; Streamlit will also show error upstream
-        print(f"Error saving submission: {e}")
-        return False
-
+        if not NATIONALITIES_CSV.exists():
+            return []
+        df = pd.read_csv(NATIONALITIES_CSV, dtype=str, keep_default_na=False)
+        if df.empty:
+            return []
+        # Prefer a column named 'Nationality' but fall back to the first column
+        if 'Nationality' in df.columns:
+            series = df['Nationality']
+        else:
+            series = df.iloc[:, 0]
+        # Normalize entries: strip whitespace and quotes, remove empties
+        nats = series.astype(str).str.strip().str.strip('"').tolist()
+        nats = [n for n in nats if n and n.lower() not in ('nan', 'none')]
+        unique_sorted = sorted(set(nats))
+        return unique_sorted
+    except Exception:
+        return []
 
 def get_locations() -> list:
     """
@@ -416,56 +106,189 @@ def get_locations() -> list:
     except Exception:
         return []
 
+def load_data() -> pd.DataFrame:
+    """
+    Load all data from the SQLite database and return a normalized DataFrame.
+    """
+    # Ensure DB is initialized
+    init_db()
+    
+    conn = get_db_connection()
+    try:
+        query = "SELECT * FROM salary_entries"
+        df = pd.read_sql_query(query, conn)
+        
+        if df.empty:
+            return pd.DataFrame(columns=CANONICAL_COLUMNS)
+            
+        # Rename DB columns to Canonical columns
+        rename_map = {
+            "role": "Role",
+            "company_location": "Company location",
+            "monthly_gross_salary": "Monthly Gross Salary",
+            "salary_gross_in_usd": "Salary Gross in USD",
+            "years_of_experience": "Years of Experience",
+            "degree": "Degree",
+            "company_size": "Approx. No. of employees in company",
+            "country_location": "Your Country/ Location",
+            "nationality": "Nationality",
+            "industry": "Industry",
+            "submission_date": "Submission Date",
+            "exchange_rate": "Real-time USD ZMW exchange rate"
+        }
+        df = df.rename(columns=rename_map)
+        
+        # Ensure all canonical columns exist
+        for col in CANONICAL_COLUMNS:
+            if col not in df.columns:
+                df[col] = ""
+                
+        # Compatibility column
+        if "Company location" in df.columns and "Company location (Country)" not in df.columns:
+            df["Company location (Country)"] = df["Company location"]
+            
+        # Normalizations (similar to original _read_csv_safe)
+        if "Degree" in df.columns:
+            df["Degree"] = df["Degree"].astype(str).str.strip().str.title().replace({"Yes": "Yes", "No": "No"})
+        if "Nationality" in df.columns:
+            nat = df["Nationality"].astype(str).str.strip().str.title()
+            df["Nationality"] = nat.replace({"Zambia": "Zambian"})
+        if "Industry" in df.columns:
+            df["Industry"] = df["Industry"].astype(str).str.strip()
+            df["Industry"] = df["Industry"].replace({
+                "FCMG": "FMCG",
+                "FINANCE": "Finance",
+                "banking": "Banking",
+            })
+            df["Industry"] = df["Industry"].str.title()
+            
+        # Ensure numeric types
+        df["Monthly Gross Salary"] = pd.to_numeric(df["Monthly Gross Salary"], errors="coerce")
+        df["Salary Gross in USD"] = pd.to_numeric(df["Salary Gross in USD"], errors="coerce")
+        
+        # Ensure dates
+        df["Submission Date"] = pd.to_datetime(df["Submission Date"], errors="coerce")
+        
+        return df[CANONICAL_COLUMNS + ["Company location (Country)"]] if "Company location (Country)" in df.columns else df[CANONICAL_COLUMNS]
+        
+    except Exception as e:
+        print(f"Error loading data from DB: {e}")
+        return pd.DataFrame(columns=CANONICAL_COLUMNS)
+    finally:
+        conn.close()
+
+def save_submission(record: dict):
+    """
+    Save a single submission to the SQLite database.
+    Returns True on success, False on failure.
+    """
+    try:
+        init_db()
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        mapping_preferences = {
+            "role": ["Role", "role"],
+            "company_location": ["Company location", "company_location", "Company location (Country)"],
+            "monthly_gross_salary": ["Monthly Gross Salary", "monthly_gross_salary_zmw", "Monthly Salary (ZMW)"],
+            "salary_gross_in_usd": ["Salary Gross in USD", "Salary Gross in USD (leave blank if you get paid in ZMW)", "salary_gross_usd"],
+            "years_of_experience": ["Years of Experience", "years_of_experience"],
+            "degree": ["Degree", "Degree (or not)", "degree"],
+            "company_size": ["Approx. No. of employees in company", "approx_no_of_employees"],
+            "country_location": ["Your Country/ Location", "country_location"],
+            "nationality": ["Nationality", "nationality"],
+            "industry": ["Industry", "industry"],
+            "submission_date": ["Submission Date", "submission_date"],
+            "exchange_rate": ["Real-time USD ZMW exchange rate", "realtime_usd_zmw_rate"]
+        }
+        
+        # Build DB row
+        db_row = {}
+        for db_col, keys in mapping_preferences.items():
+            val = None
+            for k in keys:
+                if k in record and record.get(k) not in (None, ""):
+                    val = record.get(k)
+                    break
+            
+            if db_col == "submission_date":
+                if not val:
+                    val = datetime.now().strftime("%Y-%m-%d")
+                else:
+                    try:
+                        # Try to parse and format as ISO
+                        val = pd.to_datetime(str(val), dayfirst=True, errors="coerce").strftime("%Y-%m-%d")
+                    except Exception:
+                        val = datetime.now().strftime("%Y-%m-%d")
+            
+            # Numeric handling
+            if db_col in ("monthly_gross_salary", "salary_gross_in_usd", "exchange_rate") and val is not None:
+                try:
+                    val = float(val)
+                except:
+                    val = None
+            
+            db_row[db_col] = val
+
+        cursor.execute('''
+            INSERT INTO salary_entries (
+                role, company_location, monthly_gross_salary, salary_gross_in_usd,
+                years_of_experience, degree, company_size, country_location,
+                nationality, industry, submission_date, exchange_rate
+            ) VALUES (
+                :role, :company_location, :monthly_gross_salary, :salary_gross_in_usd,
+                :years_of_experience, :degree, :company_size, :country_location,
+                :nationality, :industry, :submission_date, :exchange_rate
+            )
+        ''', db_row)
+        
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as e:
+        print(f"Error saving submission to DB: {e}")
+        return False
 
 def backfill_new_csv_submission_dates(
     start_date: str = "2023-08-03",
     end_date: str = "2023-12-31"
 ) -> int:
     """
-    Backfill missing or blank 'Submission Date' values in NEW_CSV with random
-    dates formatted as dd/mm/YYYY between the given inclusive date range.
-
-    Returns the number of rows updated.
+    Backfill missing 'submission_date' values in DB with random dates.
     """
-    _ensure_csv_exists(NEW_CSV)
-    if not NEW_CSV.exists():
-        return 0
-
-    # Load as strings to preserve formatting and columns
-    df = pd.read_csv(NEW_CSV, dtype=str, keep_default_na=False)
-    if df.empty:
-        return 0
-    if "Submission Date" not in df.columns:
-        df["Submission Date"] = ""
-
-    # Prepare date range
     try:
-        start_dt = pd.to_datetime(start_date)
-        end_dt = pd.to_datetime(end_date)
-    except Exception:
-        # Fallback hard-coded if parsing fails
-        start_dt = pd.Timestamp(2023, 8, 3)
-        end_dt = pd.Timestamp(2023, 12, 31)
-
-    total_days = (end_dt - start_dt).days
-    if total_days < 0:
-        start_dt, end_dt = end_dt, start_dt
+        init_db()
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Find rows with missing dates
+        cursor.execute("SELECT id FROM salary_entries WHERE submission_date IS NULL OR submission_date = ''")
+        rows = cursor.fetchall()
+        
+        if not rows:
+            conn.close()
+            return 0
+            
+        try:
+            start_dt = pd.to_datetime(start_date)
+            end_dt = pd.to_datetime(end_date)
+        except Exception:
+            start_dt = pd.Timestamp(2023, 8, 3)
+            end_dt = pd.Timestamp(2023, 12, 31)
+            
         total_days = (end_dt - start_dt).days
-
-    # Identify rows needing backfill
-    sub = df["Submission Date"].astype(str).str.strip()
-    mask = sub.eq("") | sub.str.lower().isin(["nan", "none", "nat"])
-
-    updated = 0
-    if mask.any():
-        # Generate random dates for each missing row
-        rand_days = [random.randint(0, total_days) for _ in range(mask.sum())]
-        rand_dates = [(start_dt + pd.Timedelta(days=d)).strftime("%d/%m/%Y") for d in rand_days]
-        df.loc[mask, "Submission Date"] = rand_dates
-        updated = int(mask.sum())
-
-        # Write back to disk atomically-ish
-        with _lock:
-            df.to_csv(NEW_CSV, index=False, encoding="utf-8")
-
-    return updated
+        updated_count = 0
+        
+        for row in rows:
+            rand_day = random.randint(0, total_days)
+            rand_date = (start_dt + pd.Timedelta(days=rand_day)).strftime("%Y-%m-%d")
+            
+            cursor.execute("UPDATE salary_entries SET submission_date = ? WHERE id = ?", (rand_date, row['id']))
+            updated_count += 1
+            
+        conn.commit()
+        conn.close()
+        return updated_count
+    except Exception as e:
+        print(f"Error backfilling dates: {e}")
+        return 0
