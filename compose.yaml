@@ -1,0 +1,101 @@
+services:
+  python-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: python-app
+    restart: unless-stopped
+    init: true
+    # env_file: ./.env  # Uncomment if .env file exists
+    # If your app requires external services (e.g., database), add them below and update 'depends_on' accordingly
+    # depends_on:
+    #   - postgres
+    #   - redis
+    #   - rabbitmq
+    #   - elasticsearch
+    #   - minio
+    # Expose ports only if your app listens on them (none detected in Dockerfile or README)
+    # ports:
+    #   - "8000:8000"  # Example, uncomment and adjust if needed
+    #   - "5000:5000"  # Example, uncomment and adjust if needed
+    networks:
+      - appnet
+
+# Example external service blocks (uncomment and configure if your app needs them)
+#  postgres:
+#    image: postgres:latest
+#    restart: unless-stopped
+#    environment:
+#      POSTGRES_USER: user
+#      POSTGRES_PASSWORD: password
+#      POSTGRES_DB: appdb
+#    volumes:
+#      - pgdata:/var/lib/postgresql/data
+#    networks:
+#      - appnet
+#    healthcheck:
+#      test: ["CMD-SHELL", "pg_isready -U user"]
+#      interval: 10s
+#      timeout: 5s
+#      retries: 5
+#
+#  redis:
+#    image: redis:latest
+#    restart: unless-stopped
+#    networks:
+#      - appnet
+#    healthcheck:
+#      test: ["CMD", "redis-cli", "ping"]
+#      interval: 10s
+#      timeout: 5s
+#      retries: 5
+#
+#  rabbitmq:
+#    image: rabbitmq:latest
+#    restart: unless-stopped
+#    networks:
+#      - appnet
+#    healthcheck:
+#      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+#      interval: 10s
+#      timeout: 5s
+#      retries: 5
+#
+#  elasticsearch:
+#    image: elasticsearch:latest
+#    restart: unless-stopped
+#    environment:
+#      discovery.type: single-node
+#    networks:
+#      - appnet
+#    healthcheck:
+#      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
+#      interval: 10s
+#      timeout: 5s
+#      retries: 5
+#
+#  minio:
+#    image: minio/minio:latest
+#    restart: unless-stopped
+#    command: server /data
+#    environment:
+#      MINIO_ROOT_USER: minio
+#      MINIO_ROOT_PASSWORD: minio123
+#    volumes:
+#      - minio-data:/data
+#    networks:
+#      - appnet
+#    healthcheck:
+#      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+#      interval: 10s
+#      timeout: 5s
+#      retries: 5
+
+networks:
+  appnet:
+    driver: bridge
+
+# Uncomment if you add persistent external services above
+#volumes:
+#  pgdata:
+#  minio-data:

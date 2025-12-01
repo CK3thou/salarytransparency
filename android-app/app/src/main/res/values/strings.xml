@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Salary Transparency</string>
+    
+    <!-- Navigation -->
+    <string name="nav_home">Home</string>
+    <string name="nav_submit">Submit Salary</string>
+    <string name="nav_visualize">Visualizations</string>
+    <string name="nav_filter">Filter</string>
+    <string name="nav_export">Export Data</string>
+    
+    <!-- Form Labels -->
+    <string name="job_title">Job Title</string>
+    <string name="company">Company</string>
+    <string name="industry">Industry</string>
+    <string name="salary">Salary</string>
+    <string name="currency">Currency</string>
+    <string name="years_experience">Years of Experience</string>
+    <string name="education_level">Education Level</string>
+    <string name="location">Location (City)</string>
+    <string name="country">Country</string>
+    <string name="nationality">Nationality</string>
+    <string name="gender">Gender</string>
+    <string name="age">Age</string>
+    <string name="benefits">Benefits</string>
+    
+    <!-- Buttons -->
+    <string name="submit">Submit</string>
+    <string name="cancel">Cancel</string>
+    <string name="apply_filters">Apply Filters</string>
+    <string name="clear_filters">Clear Filters</string>
+    <string name="export_csv">Export to CSV</string>
+    <string name="import_csv">Import from CSV</string>
+    
+    <!-- Statistics -->
+    <string name="total_entries">Total Entries</string>
+    <string name="average_salary">Average Salary</string>
+    <string name="median_salary">Median Salary</string>
+    <string name="min_salary">Min Salary</string>
+    <string name="max_salary">Max Salary</string>
+    
+    <!-- Messages -->
+    <string name="submit_success">Salary data submitted successfully!</string>
+    <string name="submit_error">Error submitting data. Please try again.</string>
+    <string name="export_success">Data exported successfully!</string>
+    <string name="import_success">Data imported successfully!</string>
+    <string name="no_data">No data available</string>
+    <string name="loading">Loading…</string>
+    
+    <!-- Chart Titles -->
+    <string name="salary_by_industry">Salary by Industry</string>
+    <string name="salary_by_experience">Salary by Experience</string>
+    <string name="salary_by_education">Salary by Education</string>
+    <string name="gender_distribution">Gender Distribution</string>
+    <string name="industry_distribution">Industry Distribution</string>
+    
+    <!-- Education Levels -->
+    <string-array name="education_levels">
+        <item>High School</item>
+        <item>Associate Degree</item>
+        <item>Bachelor\'s Degree</item>
+        <item>Master\'s Degree</item>
+        <item>PhD</item>
+        <item>Other</item>
+    </string-array>
+    
+    <!-- Gender Options -->
+    <string-array name="gender_options">
+        <item>Male</item>
+        <item>Female</item>
+        <item>Non-binary</item>
+        <item>Prefer not to say</item>
+    </string-array>
+    
+    <!-- Currency Options -->
+    <string-array name="currency_options">
+        <item>USD</item>
+        <item>ZMW</item>
+        <item>EUR</item>
+        <item>GBP</item>
+    </string-array>
+</resources>

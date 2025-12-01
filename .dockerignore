@@ -1,0 +1,84 @@
+# Python cache and build artifacts
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.coverage
+*.egg-info/
+dist/
+build/
+*.manifest
+*.spec
+
+# Test and development directories
+*/test/
+*/tests/
+*.test
+
+# IDE and editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Version control
+.git/
+.gitignore
+.svn/
+.hg/
+
+# Environment and secrets
+.env*
+*.env
+*.pem
+*.key
+*.crt
+config.local.*
+*.local.yml
+
+# Documentation and markdown
+/docs/
+*.md
+README*
+
+# Docker and compose files
+Dockerfile*
+docker-compose*
+
+# Temporary and local files
+tmp/
+temp/
+*.tmp
+.local/
+local/
+
+# Node.js (in case of mixed projects)
+node_modules/
+npm-debug.log
+yarn-debug.log
+
+# Go (in case of mixed projects)
+/go-cache/
+
+# Java (in case of mixed projects)
+target/
+*.class
+.gradle/
+
+# Miscellaneous
+*.log
+debug/
+out/
+
+# Project-specific: Python virtual environments
+.conda311/
+
+# Exclude lock files and build scripts explicitly (do NOT ignore)
+# *.lock
+# .mvnw
+# .gradlew
+# .mvn/
+# .gradle/
+
+# End of .dockerignore
