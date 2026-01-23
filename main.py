@@ -11,7 +11,7 @@ from utils.visualizations import (
     create_top_roles_salary
 )
 from components.forms import submission_form
-from components.filters import country_filter
+from components.filters import country_filter, industry_filter
 import os
 
 st.set_page_config(
@@ -554,14 +554,6 @@ def main():
             unique_roles = len(df['Role'].unique())
             st.metric("Unique Roles", unique_roles)
 
-        # Optional FX source caption for debugging/visibility
-        try:
-            fx_src = st.session_state.get('fx_source', '')
-            if fx_src:
-                st.caption(f"Rates: {fx_src} (cached)")
-        except Exception:
-            pass
-
         # Country Filter
         st.markdown("""
             <div style="margin-top: 2rem; margin-bottom: 1rem;">
@@ -585,13 +577,28 @@ def main():
             # Apply country filter to dataframe
             if selected_country != 'All Countries':
                 df_filtered = df[df['Company location (Country)'] == selected_country].copy()
-                st.info(f"Showing data for: **{selected_country}** ({len(df_filtered)} entries)")
             else:
                 df_filtered = df.copy()
-                st.info(f"Showing data for: **All Countries** ({len(df_filtered)} entries)")
         else:
             df_filtered = df.copy()
-            st.warning("Country column not found in data.")
+            selected_country = 'All Countries'
+
+        # Industry Filter
+        st.markdown("""
+            <div style="margin-top: 1.5rem; margin-bottom: 1rem;">
+                <h3 style="color: #2d3748; font-weight: 600;">
+                    🏢 Filter by Industry
+                </h3>
+            </div>
+        """, unsafe_allow_html=True)
+        
+        # Apply industry filter to the already country-filtered dataframe
+        selected_industry = industry_filter(df_filtered)
+        if selected_industry != "All Industries":
+            df_filtered = df_filtered[df_filtered['Industry'].fillna("").astype(str).str.strip() == selected_industry].copy()
+        
+        # Display filter summary
+        st.info(f"Showing data for: **{selected_country}** • **{selected_industry}** ({len(df_filtered)} entries)")
 
         # Recalculate metrics for filtered data
         st.markdown("""

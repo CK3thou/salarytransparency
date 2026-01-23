@@ -23,3 +23,22 @@ def country_filter(df: pd.DataFrame):
     options = ["All"] + unique
     selected = st.sidebar.selectbox("Filter by country", options, index=0)
     return selected
+
+def industry_filter(df: pd.DataFrame):
+    """
+    Industry filter: returns the selected industry string (or "All Industries").
+    """
+    if df.empty or "Industry" not in df.columns:
+        return "All Industries"
+    
+    industries = df["Industry"].fillna("").astype(str).str.strip()
+    # remove empty/"nan" entries and sort
+    unique = sorted(x for x in pd.unique(industries) if str(x).strip() and str(x).lower() != "nan")
+    options = ["All Industries"] + unique
+    selected = st.selectbox(
+        "🏢 Filter by Industry",
+        options=options,
+        index=0,
+        key="industry_filter_main"
+    )
+    return selected
