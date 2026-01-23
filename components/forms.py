@@ -120,6 +120,7 @@ def submission_form(save_callback):
                     padding: 0.75rem;
                     transition: all 0.3s ease;
                     background: white;
+                    color: black;
                 }
                 
                 .stTextInput > div > div > input:focus,
