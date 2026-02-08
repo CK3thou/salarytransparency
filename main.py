@@ -5,6 +5,7 @@ import streamlit as st
 import streamlit.components.v1 as components
 import pandas as pd
 from utils.data_handler import load_data, save_submission
+from utils.db_setup import check_db_health
 from utils.visualizations import (
     create_salary_distribution, create_experience_salary_correlation,
     create_industry_salary_box, create_degree_distribution,
@@ -36,6 +37,10 @@ def main():
         # This allows the app to work even if context detection fails
         ctx = None
         st.warning(f"Note: Script context detection failed: {e}. App may have limited functionality.")
+    
+    # Check database health on startup
+    if not check_db_health():
+        st.error("⚠️ Database error detected. Check the console logs for details.")
     
     # Google Analytics - inject into page head using full HTML document
     GOOGLE_ANALYTICS_CODE = """
@@ -433,6 +438,19 @@ def main():
                 import urllib.request
                 import urllib.parse
 
+                # Fallback hardcoded rates (updated Feb 2026)
+                FALLBACK_RATES = {
+                    'USD': 1.0,
+                    'ZMW': 0.029,    # ~34.5 ZMW per USD
+                    'ZAR': 0.053,    # ~18.9 ZAR per USD  
+                    'ZWL': 0.0054,   # ~185 ZWL per USD
+                    'GBP': 1.27,
+                    'EUR': 1.11,
+                    'INR': 0.012,
+                    'NGN': 0.00065,
+                    'KES': 0.0077,
+                }
+
                 # API key resolution: prefer secrets/env, fallback to provided key
                 api_key = None
                 try:
@@ -455,7 +473,7 @@ def main():
                 }
                 url = 'https://api.forexrateapi.com/v1/latest?' + urllib.parse.urlencode(params, safe=',')
 
-                def _return(inv: dict) -> dict:
+                def _return(inv: dict, source: str) -> dict:
                     out = {'USD': 1.0}
                     for k, v in (inv or {}).items():
                         try:
@@ -464,11 +482,17 @@ def main():
                             out[str(k).upper()] = float(v)
                         except Exception:
                             continue
-                    return {'rates': out, 'source': 'forexrateapi.com'}
+                    return {'rates': out, 'source': source}
 
                 try:
+                    print(f"DEBUG: Attempting to fetch forex rates from {url[:80]}...")
                     with urllib.request.urlopen(url, timeout=4) as resp:
                         data = json.loads(resp.read().decode('utf-8'))
+                        # Check if API returned an error
+                        if 'error' in data or not data.get('rates'):
+                            print(f"DEBUG: API returned error or empty rates: {data}")
+                            raise Exception(f"API Error: {data.get('error', 'Empty rates')}")
+                        
                         # API returns USD->CODE rates; convert to CODE->USD
                         usd_to_code = data.get('rates', {}) or {}
                         inv = {}
@@ -478,10 +502,14 @@ def main():
                                 inv[str(c).upper()] = (1.0 / rv) if rv != 0 else None
                             except Exception:
                                 continue
-                        return _return(inv)
-                except Exception:
-                    # Last resort: only USD
-                    return _return({'USD': 1.0})
+                        print(f"DEBUG: Successfully fetched rates: {inv}")
+                        return _return(inv, 'forexrateapi.com (live)')
+                except Exception as e:
+                    print(f"DEBUG: Forex API failed ({e}), using fallback rates")
+                    # Use fallback rates for requested currencies
+                    fallback_subset = {k: v for k, v in FALLBACK_RATES.items() if k.upper() in codes_csv.upper()}
+                    return _return(fallback_subset, 'fallback (hardcoded)')
+
 
             try:
                 # Ensure numeric salary
@@ -492,13 +520,33 @@ def main():
                     codes = df['Currency Code'].astype(str).str.upper().fillna('')
                     unique_codes = sorted(set([c for c in codes.tolist() if c and c != 'USD']))
                     codes_csv = ','.join(unique_codes)
+                    
+                    # Debug: log what's being requested
+                    if unique_codes:
+                        print(f"DEBUG: Fetching forex rates for codes: {unique_codes}")
+                    
                     payload = get_rates_code_to_usd(codes_csv)
                     rates_map = payload.get('rates', {})
                     st.session_state['fx_source'] = payload.get('source', '')
+                    
+                    # Debug: log rates received
+                    print(f"DEBUG: Rates map: {rates_map}")
+                    print(f"DEBUG: Total entries: {len(df)}, Currency codes distribution:")
+                    print(f"  {df['Currency Code'].value_counts().to_dict()}")
+                    
                     rates = codes.map(lambda x: rates_map.get(x, None)).astype(float)
                     df['Monthly Salary in USD'] = df['Monthly Gross Salary'] * rates
-            except Exception:
-                pass
+                    
+                    # Debug: log conversion results
+                    usd_col = df['Monthly Salary in USD']
+                    non_null_count = usd_col.notna().sum()
+                    print(f"DEBUG: Non-null USD values after conversion: {non_null_count}/{len(df)}")
+                    if non_null_count > 0:
+                        print(f"  USD value range: ${usd_col.min():,.2f} - ${usd_col.max():,.2f}")
+            except Exception as e:
+                print(f"DEBUG: Error during forex conversion: {e}")
+                import traceback
+                traceback.print_exc()
             # If a recent submission exists from the form, show a toast and a compact preview
             if "recent_submission" in st.session_state:
                 recent = st.session_state.pop("recent_submission", None)
@@ -546,10 +594,23 @@ def main():
         with metrics[0]:
             st.metric("Total Entries", len(df))
         with metrics[1]:
-            # Average in USD if available
-            s = pd.to_numeric(df.get('Monthly Salary in USD'), errors='coerce')
-            avg_salary = float(s.mean()) if s is not None and len(s) else 0.0
-            st.metric("Average Salary (USD)", f"{avg_salary:,.2f}")
+            # Average in USD if available - try primary USD column, fall back to Salary Gross in USD
+            if 'Monthly Salary in USD' in df.columns:
+                usd_values = df['Monthly Salary in USD'].copy()
+                # Fallback to Salary Gross in USD for any missing values
+                if usd_values.isna().any() and 'Salary Gross in USD' in df.columns:
+                    fallback = pd.to_numeric(df['Salary Gross in USD'], errors='coerce')
+                    usd_values = usd_values.fillna(fallback)
+                
+                s = pd.to_numeric(usd_values, errors='coerce')
+                valid_values = s.dropna()
+                if len(valid_values) > 0:
+                    avg_salary = float(valid_values.mean())
+                    st.metric("Average Salary (USD)", f"{avg_salary:,.2f}")
+                else:
+                    st.metric("Average Salary (USD)", "N/A")
+            else:
+                st.metric("Average Salary (USD)", "N/A")
         with metrics[2]:
             unique_roles = len(df['Role'].unique())
             st.metric("Unique Roles", unique_roles)
@@ -613,9 +674,29 @@ def main():
         with filtered_metrics[0]:
             st.metric("Filtered Entries", len(df_filtered))
         with filtered_metrics[1]:
-            s_filtered = pd.to_numeric(df_filtered.get('Monthly Salary in USD'), errors='coerce')
-            avg_salary_filtered = float(s_filtered.mean()) if s_filtered is not None and len(s_filtered) > 0 else 0.0
-            st.metric("Average Salary (USD)", f"{avg_salary_filtered:,.2f}")
+            # Calculate average USD salary with all entries, not just USD
+            if 'Monthly Salary in USD' in df_filtered.columns and len(df_filtered) > 0:
+                # For entries without Currency Code USD conversion, fall back to direct Salary Gross in USD if available
+                usd_values = df_filtered['Monthly Salary in USD'].copy()
+                
+                # For any missing USD conversions, check if "Salary Gross in USD" column exists
+                if usd_values.isna().any() and 'Salary Gross in USD' in df_filtered.columns:
+                    usd_fallback = pd.to_numeric(df_filtered['Salary Gross in USD'], errors='coerce')
+                    usd_values = usd_values.fillna(usd_fallback)
+                
+                usd_values_numeric = pd.to_numeric(usd_values, errors='coerce')
+                valid_values = usd_values_numeric.dropna()
+                
+                if len(valid_values) > 0:
+                    avg_salary_filtered = float(valid_values.mean())
+                    st.metric("Average Salary (USD)", f"{avg_salary_filtered:,.2f}")
+                    if len(valid_values) < len(df_filtered):
+                        st.caption(f"Based on {len(valid_values)}/{len(df_filtered)} converted entries")
+                else:
+                    st.metric("Average Salary (USD)", "N/A")
+                    st.caption("No USD data available for filter")
+            else:
+                st.metric("Average Salary (USD)", "N/A")
         with filtered_metrics[2]:
             unique_roles_filtered = len(df_filtered['Role'].unique()) if len(df_filtered) > 0 else 0
             st.metric("Unique Roles", unique_roles_filtered)
@@ -628,10 +709,37 @@ def main():
                 </h2>
             </div>
         """, unsafe_allow_html=True)
+        
+        # Diagnostic info about USD conversion
+        with st.expander("🔧 Currency Conversion Status", expanded=False):
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                try:
+                    currency_dist = df['Currency Code'].value_counts().to_dict() if 'Currency Code' in df.columns else {}
+                    st.metric("Currency Types", len(currency_dist))
+                    if currency_dist:
+                        st.caption(", ".join([f"{k}({v})" for k, v in sorted(currency_dist.items())[:5]]))
+                except Exception:
+                    st.metric("Currency Types", "?")
+            with col2:
+                try:
+                    usd_count = df['Monthly Salary in USD'].notna().sum() if 'Monthly Salary in USD' in df.columns else 0
+                    st.metric("Converted to USD", usd_count)
+                    st.caption(f"out of {len(df)} entries")
+                except Exception:
+                    st.metric("Converted to USD", "?")
+            with col3:
+                try:
+                    fx_source = st.session_state.get('fx_source', 'Not available')
+                    st.metric("FX Source", "✅ Live" if "forexrateapi" in fx_source else "❌ Fallback")
+                    st.caption(fx_source[:30] if fx_source else "N/A")
+                except Exception:
+                    st.metric("FX Source", "?")
+        
         # Hint if FX-derived USD values are missing
         try:
             if 'Monthly Salary in USD' not in df.columns or pd.to_numeric(df.get('Monthly Salary in USD'), errors='coerce').notna().sum() == 0:
-                st.info("Live FX rates unavailable or not yet loaded; USD values may be blank.")
+                st.warning("⚠️ **No USD values available** - Either Currency Code mapping failed or Forex API is unavailable. Average Salary will be calculated from available USD entries only.")
         except Exception:
             pass
         try:

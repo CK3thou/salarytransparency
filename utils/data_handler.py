@@ -180,7 +180,7 @@ def load_data() -> pd.DataFrame:
 def save_submission(record: dict):
     """
     Save a single submission to the SQLite database.
-    Returns True on success, False on failure.
+    Returns tuple: (success: bool, message: str)
     """
     try:
         init_db()
@@ -242,12 +242,26 @@ def save_submission(record: dict):
             )
         ''', db_row)
         
+        # Verify the insert was successful
+        last_row_id = cursor.lastrowid
         conn.commit()
-        conn.close()
-        return True
+        
+        # Double-check that the row was actually inserted
+        cursor.execute("SELECT id FROM salary_entries WHERE id = ?", (last_row_id,))
+        if cursor.fetchone():
+            conn.close()
+            return (True, "Submission saved successfully!")
+        else:
+            print(f"Warning: Insert may have failed - row not found after commit")
+            conn.close()
+            return (False, "Database insert verification failed. Please try again.")
+            
     except Exception as e:
-        print(f"Error saving submission to DB: {e}")
-        return False
+        error_msg = str(e)
+        print(f"Error saving submission to DB: {error_msg}")
+        import traceback
+        traceback.print_exc()
+        return (False, f"Failed to save submission: {error_msg}")
 
 def backfill_new_csv_submission_dates(
     start_date: str = "2023-08-03",

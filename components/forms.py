@@ -195,7 +195,15 @@ def submission_form(save_callback):
                 'Industry': industry
             }
 
-            if save_callback(data):
+            result = save_callback(data)
+            # Handle both old (boolean) and new (tuple) return formats
+            if isinstance(result, tuple):
+                success, message = result
+            else:
+                success = result
+                message = "Submission saved!" if success else "Failed to save submission"
+            
+            if success:
                 # Store recent submission in session so main app can toast and highlight it
                 st.session_state["recent_submission"] = data
                 # Also keep a session-local buffer so the row appears immediately
@@ -206,10 +214,10 @@ def submission_form(save_callback):
                     st.session_state["local_rows"] = buf
                 except Exception:
                     pass
-                st.success("Thank you for your submission!")
+                st.success(message)
                 # Rerun to refresh the main table immediately
                 st.rerun()
                 return True
             else:
-                st.error("An error occurred while saving your submission.")
+                st.error(message)
                 return False
