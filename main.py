@@ -427,10 +427,10 @@ def main():
                 pass
             # Derive USD equivalent using forexrateapi.com in one batched call (cached)
             @st.cache_data(ttl=21600, show_spinner=False)
-            def get_rates_code_to_usd(codes_csv: str) -> dict:
+            def get_rates_code_to_usd(codes_csv: str = None) -> dict:
                 """Fetch CODE->USD rates using forexrateapi.com with USD base.
                 Args:
-                    codes_csv: Comma-separated list of 3-letter currency codes to request.
+                    codes_csv: Optional comma-separated currencies. If None, fetches ALL from worldcities.
                 Returns:
                     { 'rates': { CODE: rate(code->USD), ... }, 'source': 'forexrateapi.com' }
                 """
@@ -438,18 +438,39 @@ def main():
                 import urllib.request
                 import urllib.parse
 
-                # Fallback hardcoded rates (updated Feb 2026)
-                FALLBACK_RATES = {
-                    'USD': 1.0,
-                    'ZMW': 0.029,    # ~34.5 ZMW per USD
-                    'ZAR': 0.053,    # ~18.9 ZAR per USD  
-                    'ZWL': 0.0054,   # ~185 ZWL per USD
-                    'GBP': 1.27,
-                    'EUR': 1.11,
-                    'INR': 0.012,
-                    'NGN': 0.00065,
-                    'KES': 0.0077,
-                }
+                # Load fallback rates from local JSON file
+                try:
+                    fx_json_path = os.path.join('data', 'fx_rates_usd.json')
+                    with open(fx_json_path, 'r') as f:
+                        fx_data = json.load(f)
+                        FALLBACK_RATES = fx_data.get('code_to_usd', {})
+                        if not FALLBACK_RATES:
+                            raise Exception("No rates in JSON file")
+                        print(f"DEBUG: Loaded {len(FALLBACK_RATES)} fallback rates from {fx_json_path}")
+                except Exception as e:
+                    print(f"DEBUG: Could not load rates from JSON: {e}, using minimal fallback")
+                    FALLBACK_RATES = {
+                        'USD': 1.0,
+                        'ZMW': 0.054,
+                        'ZAR': 0.062,
+                        'ZWL': 0.0031,
+                    }
+
+                # If no specific currencies requested, use ALL from worldcities.csv
+                if not codes_csv:
+                    all_currencies = [
+                        'AED,AFN,ALL,AMD,ANG,AOA,ARS,AUD,AWG,AZN,BAM,BBD,BDT,BGN,BHD,'
+                        'BIF,BMD,BND,BOB,BRL,BSD,BTN,BWP,BYN,BZD,CAD,CDF,CHF,CLP,CNY,COP,'
+                        'CRC,CUP,CVE,CZK,DJF,DKK,DOP,DZD,EGP,ERN,ETB,EUR,FJD,FKP,GBP,GEL,'
+                        'GHS,GIP,GMD,GNF,GTQ,GYD,HKD,HNL,HTG,HUF,IDR,ILS,INR,IQD,IRR,ISK,'
+                        'JMD,JOD,JPY,KES,KGS,KHR,KMF,KRW,KWD,KYD,KZT,LAK,LBP,LKR,LRD,LYD,'
+                        'MAD,MDL,MGA,MKD,MMK,MNT,MOP,MRU,MUR,MVR,MWK,MXN,MYR,MZN,NAD,NGN,'
+                        'NIO,NOK,NPR,NZD,OMR,PAB,PEN,PGK,PHP,PKR,PLN,PYG,QAR,RON,RSD,RUB,'
+                        'RWF,SAR,SBD,SCR,SDG,SEK,SGD,SHP,SLE,SOS,SRD,SSP,STN,SYP,SZL,THB,'
+                        'TJS,TMT,TND,TOP,TRY,TTD,TWD,TZS,UAH,UGX,USD,UYU,UZS,VES,VND,VUV,'
+                        'WST,XAF,XCD,XOF,XPF,YER,ZAR,ZMW,ZWL'
+                    ]
+                    codes_csv = ''.join(all_currencies)
 
                 # API key resolution: prefer secrets/env, fallback to provided key
                 api_key = None
@@ -485,7 +506,7 @@ def main():
                     return {'rates': out, 'source': source}
 
                 try:
-                    print(f"DEBUG: Attempting to fetch forex rates from {url[:80]}...")
+                    print(f"DEBUG: Attempting to fetch forex rates for {len(codes_csv.split(','))} currencies...")
                     with urllib.request.urlopen(url, timeout=4) as resp:
                         data = json.loads(resp.read().decode('utf-8'))
                         # Check if API returned an error
@@ -502,13 +523,15 @@ def main():
                                 inv[str(c).upper()] = (1.0 / rv) if rv != 0 else None
                             except Exception:
                                 continue
-                        print(f"DEBUG: Successfully fetched rates: {inv}")
+                        print(f"DEBUG: ✅ Successfully fetched {len(inv)} live rates from forexrateapi.com")
                         return _return(inv, 'forexrateapi.com (live)')
                 except Exception as e:
                     print(f"DEBUG: Forex API failed ({e}), using fallback rates")
                     # Use fallback rates for requested currencies
                     fallback_subset = {k: v for k, v in FALLBACK_RATES.items() if k.upper() in codes_csv.upper()}
+                    print(f"DEBUG: Using {len(fallback_subset)} fallback rates")
                     return _return(fallback_subset, 'fallback (hardcoded)')
+
 
 
             try:
@@ -519,18 +542,18 @@ def main():
                 if 'Currency Code' in df.columns and 'Monthly Gross Salary' in df.columns:
                     codes = df['Currency Code'].astype(str).str.upper().fillna('')
                     unique_codes = sorted(set([c for c in codes.tolist() if c and c != 'USD']))
-                    codes_csv = ','.join(unique_codes)
                     
                     # Debug: log what's being requested
                     if unique_codes:
-                        print(f"DEBUG: Fetching forex rates for codes: {unique_codes}")
+                        print(f"DEBUG: Data contains {len(unique_codes)} unique currency codes: {unique_codes}")
                     
-                    payload = get_rates_code_to_usd(codes_csv)
+                    # Fetch all available rates (or specific ones if needed)
+                    payload = get_rates_code_to_usd()  # No parameter = fetch ALL currencies
                     rates_map = payload.get('rates', {})
                     st.session_state['fx_source'] = payload.get('source', '')
                     
                     # Debug: log rates received
-                    print(f"DEBUG: Rates map: {rates_map}")
+                    print(f"DEBUG: Rates map has {len(rates_map)} currencies")
                     print(f"DEBUG: Total entries: {len(df)}, Currency codes distribution:")
                     print(f"  {df['Currency Code'].value_counts().to_dict()}")
                     
