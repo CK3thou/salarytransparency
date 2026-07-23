@@ -1,895 +1,287 @@
+import argparse
+import html
 import os
-import sys
+import urllib.parse
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-import streamlit as st
-import streamlit.components.v1 as components
 import pandas as pd
+
 from utils.data_handler import load_data, save_submission
 from utils.db_setup import check_db_health
-from utils.visualizations import (
-    create_salary_distribution, create_experience_salary_correlation,
-    create_industry_salary_box, create_degree_distribution,
-    create_top_roles_salary
-)
-from components.forms import submission_form
-from components.filters import country_filter, industry_filter
-import os
-
-st.set_page_config(
-    page_title="Salary Transparency Platform",
-    page_icon="💰",
-    layout="wide",
-    initial_sidebar_state="collapsed"  # Better for mobile
-)
-
-def main():
-    # Detect whether the app is being run via `streamlit run` (script run context).
-    # When running the script directly with `python main.py`, Streamlit's
-    # ScriptRunContext is not available and features like session state
-    # will emit repeated warnings. In that case, print an instruction and exit
-    # early to avoid noisy logs.
-    try:
-        # Import locally to avoid import-time side effects when not available
-        from streamlit.runtime.scriptrunner import get_script_run_ctx
-        ctx = get_script_run_ctx()
-    except Exception as e:
-        # If we can't get context, still try to run the app
-        # This allows the app to work even if context detection fails
-        ctx = None
-        st.warning(f"Note: Script context detection failed: {e}. App may have limited functionality.")
-    
-    # Check database health on startup
-    if not check_db_health():
-        st.error("⚠️ Database error detected. Check the console logs for details.")
-    
-    # Google Analytics - inject into page head using full HTML document
-    GOOGLE_ANALYTICS_CODE = """
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <!-- Google tag (gtag.js) -->
-        <script async src="https://www.googletagmanager.com/gtag/js?id=G-62K86SX2TC"></script>
-        <script>
-          window.dataLayer = window.dataLayer || [];
-          function gtag(){dataLayer.push(arguments);}
-          gtag('js', new Date());
-          gtag('config', 'G-62K86SX2TC');
-        </script>
-        <script>
-          // Send to parent window to ensure tracking works
-          if (window.parent) {
-            window.parent.dataLayer = window.parent.dataLayer || [];
-            function parentGtag(){window.parent.dataLayer.push(arguments);}
-            parentGtag('js', new Date());
-            parentGtag('config', 'G-62K86SX2TC');
-          }
-        </script>
-    </head>
-    <body></body>
-    </html>
-    """
-    components.html(GOOGLE_ANALYTICS_CODE, height=0, width=0)
-
-    # PWA Setup
-    st.markdown("""
-        <link rel="manifest" href="./static/manifest.json">
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <meta name="theme-color" content="#0066cc">
-        <meta name="apple-mobile-web-app-capable" content="yes">
-        <meta name="apple-mobile-web-app-status-bar-style" content="black">
-        <meta name="apple-mobile-web-app-title" content="SalaryApp">
-        <link rel="apple-touch-icon" href="./static/icons/icon-192.png">
-        <script>
-            if ('serviceWorker' in navigator) {
-                window.addEventListener('load', () => {
-                    navigator.serviceWorker.register('./static/sw.js', { scope: './' })
-                        .catch(err => console.warn('Service worker registration failed:', err));
-                });
-            }
-        </script>
-    """, unsafe_allow_html=True)
-
-    # Modern, visually appealing styles
-    st.markdown("""
-        <style>
-            /* Import modern fonts */
-            @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-            
-            /* Global styling */
-            * {
-                font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-            }
-            
-            /* Main container with gradient background */
-            .main {
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                background-attachment: fixed;
-                min-height: 100vh;
-            }
-            
-            /* Content container with glassmorphism effect */
-            .main .block-container {
-                background: rgba(255, 255, 255, 0.95);
-                backdrop-filter: blur(10px);
-                border-radius: 20px;
-                padding: 2.5rem !important;
-                box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-                margin-top: 1rem;
-                margin-bottom: 2rem;
-            }
-            
-            /* Enhanced title styling */
-            h1 {
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                -webkit-background-clip: text;
-                -webkit-text-fill-color: transparent;
-                background-clip: text;
-                font-weight: 700;
-                font-size: 2.5rem;
-                margin-bottom: 1.5rem;
-                text-align: center;
-            }
-            
-            h2, h3 {
-                color: #2d3748;
-                font-weight: 600;
-                margin-top: 2rem;
-                margin-bottom: 1rem;
-            }
-            
-            /* Modern metric cards */
-            [data-testid="stMetricValue"] {
-                font-size: 2rem;
-                font-weight: 700;
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                -webkit-background-clip: text;
-                -webkit-text-fill-color: transparent;
-                background-clip: text;
-            }
-            
-            [data-testid="stMetricLabel"] {
-                font-size: 0.9rem;
-                color: #718096;
-                font-weight: 500;
-                text-transform: uppercase;
-                letter-spacing: 0.5px;
-            }
-            
-            /* Enhanced metric containers */
-            [data-testid="stMetricContainer"] {
-                background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
-                padding: 1.5rem;
-                border-radius: 15px;
-                border: 1px solid rgba(102, 126, 234, 0.2);
-                box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
-                transition: transform 0.2s, box-shadow 0.2s;
-            }
-            
-            [data-testid="stMetricContainer"]:hover {
-                transform: translateY(-2px);
-                box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
-            }
-            
-            /* Enhanced buttons */
-            .stButton > button {
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                color: white;
-                border: none;
-                border-radius: 10px;
-                padding: 0.75rem 2rem;
-                font-weight: 600;
-                transition: all 0.3s ease;
-                box-shadow: 0 4px 6px rgba(102, 126, 234, 0.3);
-                min-height: 44px;
-            }
-            
-            .stButton > button:hover {
-                transform: translateY(-2px);
-                box-shadow: 0 6px 12px rgba(102, 126, 234, 0.4);
-            }
-            
-            /* Enhanced form inputs */
-            .stTextInput > div > div > input,
-            .stNumberInput > div > div > input,
-            .stSelectbox > div > div > select {
-                border-radius: 10px;
-                border: 2px solid #e2e8f0;
-                padding: 0.75rem;
-                transition: all 0.3s ease;
-            }
-            
-            .stTextInput > div > div > input:focus,
-            .stNumberInput > div > div > input:focus,
-            .stSelectbox > div > div > select:focus {
-                border-color: #667eea;
-                box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-            }
-            
-            /* Enhanced alerts */
-            .stAlert {
-                border-radius: 12px;
-                border-left: 4px solid;
-                padding: 1rem 1.5rem;
-                box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-            }
-            
-            .stAlert[data-baseweb="notification"] {
-                background: rgba(102, 126, 234, 0.1);
-                border-left-color: #667eea;
-            }
-            
-            /* Enhanced expander */
-            .streamlit-expanderHeader {
-                background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
-                border-radius: 10px;
-                padding: 1rem;
-                font-weight: 600;
-                color: #2d3748;
-            }
-            
-            /* Enhanced dataframe */
-            .stDataFrame {
-                border-radius: 12px;
-                overflow: hidden;
-                box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-            }
-            
-            /* Table container for mobile */
-            .table-container {
-                overflow-x: auto;
-                -webkit-overflow-scrolling: touch;
-                margin: 1rem -1rem;
-                padding: 0 1rem;
-                border-radius: 12px;
-            }
-            
-            /* Mobile-first responsive styles */
-            @media (max-width: 768px) {
-                .main .block-container {
-                    padding: 1.5rem !important;
-                    border-radius: 15px;
-                }
-                
-                h1 {
-                    font-size: 2rem;
-                }
-                
-                .stDataFrame {
-                    font-size: 14px;
-                }
-                
-                .stSelectbox {
-                    max-width: 100% !important;
-                }
-                
-                [data-testid="stMetricValue"] {
-                    font-size: 1.5rem;
-                }
-                
-                [data-testid="stMetricContainer"] {
-                    padding: 1rem;
-                }
-            }
-            
-            /* Hide desktop-only elements on mobile */
-            @media (max-width: 768px) {
-                .desktop-only {
-                    display: none !important;
-                }
-            }
-            
-            /* Native-like app styling */
-            body {
-                -webkit-tap-highlight-color: transparent;
-                -webkit-touch-callout: none;
-            }
-            
-            /* Smooth scrolling */
-            .main {
-                scroll-behavior: smooth;
-                -webkit-overflow-scrolling: touch;
-            }
-            
-            /* Enhanced exception display */
-            .stException {
-                font-size: 0.9em;
-                overflow-x: auto;
-                white-space: pre-wrap;
-                border-radius: 8px;
-                padding: 1rem;
-                background: #fee;
-            }
-            
-            /* Caption styling */
-            .stCaption {
-                color: #718096;
-                font-size: 0.85rem;
-            }
-            
-            /* Subheader styling */
-            .stSubheader {
-                color: #2d3748;
-                font-weight: 600;
-                margin-top: 2rem;
-            }
-        </style>
-    """, unsafe_allow_html=True)
-
-    # Hero section with enhanced title
-    st.markdown("""
-        <div style="text-align: center; margin-bottom: 2rem;">
-            <h1 style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                       -webkit-background-clip: text;
-                       -webkit-text-fill-color: transparent;
-                       background-clip: text;
-                       font-weight: 700;
-                       font-size: 3rem;
-                       margin-bottom: 0.5rem;">
-                💰 Salary Transparency Platform
-            </h1>
-            <p style="color: #718096; font-size: 1.1rem; margin-top: 0;">
-                Empowering transparency through data sharing
-            </p>
-        </div>
-    """, unsafe_allow_html=True)
-
-    @st.cache_data(show_spinner=False)
-    def load_currency_map():
-        """Load mapping of Location -> Currency Code from data/worldcities.csv."""
-        try:
-            path = os.path.join('data', 'worldcities.csv')
-            wdf = pd.read_csv(path, dtype=str)
-            wdf = wdf[['Location', 'Currency Code']].dropna()
-            wdf['Location'] = wdf['Location'].astype(str).str.strip().str.lower()
-            # Normalize currency code to first 3-letter token (handle slashes/parentheses)
-            def norm_code(x: str) -> str:
-                x = str(x)
-                # remove text in parentheses
-                if '(' in x:
-                    x = x.split('(')[0]
-                # split by slash or comma and take first
-                for sep in ['/', ',']:
-                    if sep in x:
-                        x = x.split(sep)[0]
-                x = x.strip().upper()
-                # take only 3-letter code if longer
-                if len(x) >= 3:
-                    x = x[:3]
-                return x
-            wdf['Currency Code'] = wdf['Currency Code'].map(norm_code)
-            wdf = wdf.drop_duplicates(subset=['Location'])
-            return dict(zip(wdf['Location'], wdf['Currency Code']))
-        except Exception:
-            return {}
-
-    # Load data with error handling
-    try:
-        # Backfill missing submission dates in new submissions file (one-time maintenance)
-        try:
-            from utils.data_handler import backfill_new_csv_submission_dates
-            backfill_new_csv_submission_dates()
-        except Exception:
-            pass
-
-        with st.spinner("Loading data..."):
-            df = load_data()
-            # Session-local pending rows (in case writes are ephemeral on cloud)
-            try:
-                pending = st.session_state.get("local_rows", [])
-                if pending:
-                    add_df = pd.DataFrame(pending)
-                    # Minimal normalization to expected columns
-                    # Keep only known columns, add missing ones as blanks
-                    expected = [
-                        'Role','Company location','Company location (Country)','Monthly Gross Salary',
-                        'Salary Gross in USD','Years of Experience','Degree',
-                        'Approx. No. of employees in company','Your Country/ Location',
-                        'Nationality','Industry','Submission Date','Real-time USD ZMW exchange rate'
-                    ]
-                    for c in expected:
-                        if c not in add_df.columns:
-                            add_df[c] = ''
-                    add_df = add_df[expected].copy()
-                    # Coerce date to dd/mm/YYYY display format
-                    add_df['Submission Date'] = pd.to_datetime(
-                        add_df['Submission Date'], errors='coerce', dayfirst=True
-                    ).dt.strftime('%d/%m/%Y')
-                    # Coerce numeric
-                    add_df['Monthly Gross Salary'] = pd.to_numeric(add_df['Monthly Gross Salary'], errors='coerce')
-                    add_df['Salary Gross in USD'] = pd.to_numeric(add_df['Salary Gross in USD'], errors='coerce')
-                    # Prefer the explicit country column for display compatibility
-                    mask_missing_country = add_df['Company location (Country)'].astype(str).str.strip().eq('')
-                    add_df.loc[mask_missing_country, 'Company location (Country)'] = add_df.loc[mask_missing_country, 'Company location']
-                    # Combine for display
-                    df = pd.concat([df, add_df], ignore_index=True)
-            except Exception:
-                pass
-        if df.empty:
-            st.info("No salary data available yet. Be the first to contribute!")
-        else:
-            st.success(f"Data loaded successfully: {len(df)} rows")
-            # Derive a Currency Code column based on user's location selections
-            try:
-                currency_lookup = load_currency_map()
-                if currency_lookup:
-                    candidates = []
-                    for col in ['Your Country/ Location', 'Company location (Country)', 'Company location']:
-                        if col in df.columns:
-                            s = df[col].astype(str).str.strip().str.lower().map(currency_lookup)
-                            candidates.append(s)
-                    if candidates:
-                        currency_code = candidates[0].copy()
-                        for s in candidates[1:]:
-                            currency_code = currency_code.fillna(s)
-                        df['Currency Code'] = currency_code.fillna('')
-            except Exception:
-                # Non-fatal if currency map fails
-                pass
-            # Derive USD equivalent using forexrateapi.com in one batched call (cached)
-            @st.cache_data(ttl=21600, show_spinner=False)
-            def get_rates_code_to_usd(codes_csv: str = None) -> dict:
-                """Fetch CODE->USD rates using forexrateapi.com with USD base.
-                Args:
-                    codes_csv: Optional comma-separated currencies. If None, fetches ALL from worldcities.
-                Returns:
-                    { 'rates': { CODE: rate(code->USD), ... }, 'source': 'forexrateapi.com' }
-                """
-                import json
-                import urllib.request
-                import urllib.parse
-
-                # Load fallback rates from local JSON file
-                try:
-                    fx_json_path = os.path.join('data', 'fx_rates_usd.json')
-                    with open(fx_json_path, 'r') as f:
-                        fx_data = json.load(f)
-                        FALLBACK_RATES = fx_data.get('code_to_usd', {})
-                        if not FALLBACK_RATES:
-                            raise Exception("No rates in JSON file")
-                        print(f"DEBUG: Loaded {len(FALLBACK_RATES)} fallback rates from {fx_json_path}")
-                except Exception as e:
-                    print(f"DEBUG: Could not load rates from JSON: {e}, using minimal fallback")
-                    FALLBACK_RATES = {
-                        'USD': 1.0,
-                        'ZMW': 0.054,
-                        'ZAR': 0.062,
-                        'ZWL': 0.0031,
-                    }
-
-                # If no specific currencies requested, use ALL from worldcities.csv
-                if not codes_csv:
-                    all_currencies = [
-                        'AED,AFN,ALL,AMD,ANG,AOA,ARS,AUD,AWG,AZN,BAM,BBD,BDT,BGN,BHD,'
-                        'BIF,BMD,BND,BOB,BRL,BSD,BTN,BWP,BYN,BZD,CAD,CDF,CHF,CLP,CNY,COP,'
-                        'CRC,CUP,CVE,CZK,DJF,DKK,DOP,DZD,EGP,ERN,ETB,EUR,FJD,FKP,GBP,GEL,'
-                        'GHS,GIP,GMD,GNF,GTQ,GYD,HKD,HNL,HTG,HUF,IDR,ILS,INR,IQD,IRR,ISK,'
-                        'JMD,JOD,JPY,KES,KGS,KHR,KMF,KRW,KWD,KYD,KZT,LAK,LBP,LKR,LRD,LYD,'
-                        'MAD,MDL,MGA,MKD,MMK,MNT,MOP,MRU,MUR,MVR,MWK,MXN,MYR,MZN,NAD,NGN,'
-                        'NIO,NOK,NPR,NZD,OMR,PAB,PEN,PGK,PHP,PKR,PLN,PYG,QAR,RON,RSD,RUB,'
-                        'RWF,SAR,SBD,SCR,SDG,SEK,SGD,SHP,SLE,SOS,SRD,SSP,STN,SYP,SZL,THB,'
-                        'TJS,TMT,TND,TOP,TRY,TTD,TWD,TZS,UAH,UGX,USD,UYU,UZS,VES,VND,VUV,'
-                        'WST,XAF,XCD,XOF,XPF,YER,ZAR,ZMW,ZWL'
-                    ]
-                    codes_csv = ''.join(all_currencies)
-
-                # API key resolution: prefer secrets/env, fallback to provided key
-                api_key = None
-                try:
-                    # Try flat secret first, then nested
-                    api_key = st.secrets.get('forexrateapi_api_key')
-                    if not api_key and 'forexrateapi' in st.secrets:
-                        api_key = st.secrets['forexrateapi'].get('api_key')
-                except Exception:
-                    api_key = None
-                if not api_key:
-                    api_key = os.environ.get('FOREXRATEAPI_API_KEY')
-                if not api_key:
-                    # Fallback to user-provided key
-                    api_key = '1e5ce0b6f7f9b60ffeb7b5f60dcf095d'
-
-                params = {
-                    'api_key': api_key,
-                    'base': 'USD',
-                    'currencies': codes_csv,
-                }
-                url = 'https://api.forexrateapi.com/v1/latest?' + urllib.parse.urlencode(params, safe=',')
-
-                def _return(inv: dict, source: str) -> dict:
-                    out = {'USD': 1.0}
-                    for k, v in (inv or {}).items():
-                        try:
-                            if v is None:
-                                continue
-                            out[str(k).upper()] = float(v)
-                        except Exception:
-                            continue
-                    return {'rates': out, 'source': source}
-
-                try:
-                    print(f"DEBUG: Attempting to fetch forex rates for {len(codes_csv.split(','))} currencies...")
-                    with urllib.request.urlopen(url, timeout=4) as resp:
-                        data = json.loads(resp.read().decode('utf-8'))
-                        # Check if API returned an error
-                        if 'error' in data or not data.get('rates'):
-                            print(f"DEBUG: API returned error or empty rates: {data}")
-                            raise Exception(f"API Error: {data.get('error', 'Empty rates')}")
-                        
-                        # API returns USD->CODE rates; convert to CODE->USD
-                        usd_to_code = data.get('rates', {}) or {}
-                        inv = {}
-                        for c, r in usd_to_code.items():
-                            try:
-                                rv = float(r)
-                                inv[str(c).upper()] = (1.0 / rv) if rv != 0 else None
-                            except Exception:
-                                continue
-                        print(f"DEBUG: ✅ Successfully fetched {len(inv)} live rates from forexrateapi.com")
-                        return _return(inv, 'forexrateapi.com (live)')
-                except Exception as e:
-                    print(f"DEBUG: Forex API failed ({e}), using fallback rates")
-                    # Use fallback rates for requested currencies
-                    fallback_subset = {k: v for k, v in FALLBACK_RATES.items() if k.upper() in codes_csv.upper()}
-                    print(f"DEBUG: Using {len(fallback_subset)} fallback rates")
-                    return _return(fallback_subset, 'fallback (hardcoded)')
 
 
+def print_banner() -> None:
+    print("\n" + "=" * 60)
+    print("Salary Transparency Platform")
+    print("Browser-based local app")
+    print("=" * 60)
 
-            try:
-                # Ensure numeric salary
-                if 'Monthly Gross Salary' in df.columns:
-                    df['Monthly Gross Salary'] = pd.to_numeric(df['Monthly Gross Salary'], errors='coerce')
-                # Compute rates once, then map per row
-                if 'Currency Code' in df.columns and 'Monthly Gross Salary' in df.columns:
-                    codes = df['Currency Code'].astype(str).str.upper().fillna('')
-                    unique_codes = sorted(set([c for c in codes.tolist() if c and c != 'USD']))
-                    
-                    # Debug: log what's being requested
-                    if unique_codes:
-                        print(f"DEBUG: Data contains {len(unique_codes)} unique currency codes: {unique_codes}")
-                    
-                    # Fetch all available rates (or specific ones if needed)
-                    payload = get_rates_code_to_usd()  # No parameter = fetch ALL currencies
-                    rates_map = payload.get('rates', {})
-                    st.session_state['fx_source'] = payload.get('source', '')
-                    
-                    # Debug: log rates received
-                    print(f"DEBUG: Rates map has {len(rates_map)} currencies")
-                    print(f"DEBUG: Total entries: {len(df)}, Currency codes distribution:")
-                    print(f"  {df['Currency Code'].value_counts().to_dict()}")
-                    
-                    rates = codes.map(lambda x: rates_map.get(x, None)).astype(float)
-                    df['Monthly Salary in USD'] = df['Monthly Gross Salary'] * rates
-                    
-                    # Debug: log conversion results
-                    usd_col = df['Monthly Salary in USD']
-                    non_null_count = usd_col.notna().sum()
-                    print(f"DEBUG: Non-null USD values after conversion: {non_null_count}/{len(df)}")
-                    if non_null_count > 0:
-                        print(f"  USD value range: ${usd_col.min():,.2f} - ${usd_col.max():,.2f}")
-            except Exception as e:
-                print(f"DEBUG: Error during forex conversion: {e}")
-                import traceback
-                traceback.print_exc()
-            # If a recent submission exists from the form, show a toast and a compact preview
-            if "recent_submission" in st.session_state:
-                recent = st.session_state.pop("recent_submission", None)
-                if recent:
-                    try:
-                        role = recent.get("Role", "")
-                        loc = recent.get("Company location (Country)", recent.get("Company location", ""))
-                        zmw = recent.get("Monthly Gross Salary")
-                        zmw_txt = f"{float(zmw):,.2f}" if zmw not in (None, "") else "-"
-                        st.toast(f"Added submission: {role} — {zmw_txt} ({loc})", icon="✅")
-                        with st.expander("Recently added (just now)", expanded=False):
-                            # Compute currency code for the recent preview (best-effort)
-                            currency_lookup = load_currency_map()
-                            recent_loc = (recent.get('Your Country/ Location') or loc or '').strip().lower()
-                            recent_ccy = currency_lookup.get(recent_loc, '') if currency_lookup else ''
-                            recent_view = {
-                                "Role": role,
-                                "Company location (Country)": loc,
-                                "Currency Code": recent_ccy,
-                                "Monthly Gross Salary": zmw,
-                                "Years of Experience": recent.get("Years of Experience", ""),
-                                "Industry": recent.get("Industry", ""),
-                            }
-                            st.dataframe(pd.DataFrame([recent_view]), use_container_width=True, hide_index=True)
-                    except Exception:
-                        # Non-fatal; continue rendering the page
-                        pass
-    except Exception as e:
-        st.error(f"Error loading data: {str(e)}")
-        st.exception(e)
-        df = pd.DataFrame()
 
-    # Main content with enhanced styling
-    st.markdown("""
-        <div style="margin-top: 2rem; margin-bottom: 1rem;">
-            <h2 style="color: #2d3748; font-weight: 600; border-bottom: 3px solid #667eea; padding-bottom: 0.5rem;">
-                📊 Submissions Overview
-            </h2>
-        </div>
-    """, unsafe_allow_html=True)
+def build_dashboard_html(df: pd.DataFrame, message: str | None = None) -> str:
+    message_html = ""
+    if message:
+        message_html = f'<div class="message">{html.escape(message)}</div>'
 
-    if not df.empty:
-        # Responsive metrics layout
-        metrics = st.columns([1, 1, 1])
-        with metrics[0]:
-            st.metric("Total Entries", len(df))
-        with metrics[1]:
-            # Average in USD if available - try primary USD column, fall back to Salary Gross in USD
-            if 'Monthly Salary in USD' in df.columns:
-                usd_values = df['Monthly Salary in USD'].copy()
-                # Fallback to Salary Gross in USD for any missing values
-                if usd_values.isna().any() and 'Salary Gross in USD' in df.columns:
-                    fallback = pd.to_numeric(df['Salary Gross in USD'], errors='coerce')
-                    usd_values = usd_values.fillna(fallback)
-                
-                s = pd.to_numeric(usd_values, errors='coerce')
-                valid_values = s.dropna()
-                if len(valid_values) > 0:
-                    avg_salary = float(valid_values.mean())
-                    st.metric("Average Salary (USD)", f"{avg_salary:,.2f}")
-                else:
-                    st.metric("Average Salary (USD)", "N/A")
-            else:
-                st.metric("Average Salary (USD)", "N/A")
-        with metrics[2]:
-            unique_roles = len(df['Role'].unique())
-            st.metric("Unique Roles", unique_roles)
-
-        # Country Filter
-        st.markdown("""
-            <div style="margin-top: 2rem; margin-bottom: 1rem;">
-                <h3 style="color: #2d3748; font-weight: 600;">
-                    🌍 Filter by Country
-                </h3>
-            </div>
-        """, unsafe_allow_html=True)
-        
-        # Get unique countries from the data
-        if 'Company location (Country)' in df.columns:
-            countries = sorted([c for c in df['Company location (Country)'].dropna().unique() if str(c).strip()])
-            country_options = ['All Countries'] + countries
-            selected_country = st.selectbox(
-                'Select Country',
-                options=country_options,
-                index=0,
-                key='country_filter'
-            )
-            
-            # Apply country filter to dataframe
-            if selected_country != 'All Countries':
-                df_filtered = df[df['Company location (Country)'] == selected_country].copy()
-            else:
-                df_filtered = df.copy()
-        else:
-            df_filtered = df.copy()
-            selected_country = 'All Countries'
-
-        # Industry Filter
-        st.markdown("""
-            <div style="margin-top: 1.5rem; margin-bottom: 1rem;">
-                <h3 style="color: #2d3748; font-weight: 600;">
-                    🏢 Filter by Industry
-                </h3>
-            </div>
-        """, unsafe_allow_html=True)
-        
-        # Apply industry filter to the already country-filtered dataframe
-        selected_industry = industry_filter(df_filtered)
-        if selected_industry != "All Industries":
-            df_filtered = df_filtered[df_filtered['Industry'].fillna("").astype(str).str.strip() == selected_industry].copy()
-        
-        # Display filter summary
-        st.info(f"Showing data for: **{selected_country}** • **{selected_industry}** ({len(df_filtered)} entries)")
-
-        # Recalculate metrics for filtered data
-        st.markdown("""
-            <div style="margin-top: 2rem; margin-bottom: 1rem;">
-                <h3 style="color: #2d3748; font-weight: 600;">
-                    📊 Filtered Metrics
-                </h3>
-            </div>
-        """, unsafe_allow_html=True)
-        
-        filtered_metrics = st.columns([1, 1, 1])
-        with filtered_metrics[0]:
-            st.metric("Filtered Entries", len(df_filtered))
-        with filtered_metrics[1]:
-            # Calculate average USD salary with all entries, not just USD
-            if 'Monthly Salary in USD' in df_filtered.columns and len(df_filtered) > 0:
-                # For entries without Currency Code USD conversion, fall back to direct Salary Gross in USD if available
-                usd_values = df_filtered['Monthly Salary in USD'].copy()
-                
-                # For any missing USD conversions, check if "Salary Gross in USD" column exists
-                if usd_values.isna().any() and 'Salary Gross in USD' in df_filtered.columns:
-                    usd_fallback = pd.to_numeric(df_filtered['Salary Gross in USD'], errors='coerce')
-                    usd_values = usd_values.fillna(usd_fallback)
-                
-                usd_values_numeric = pd.to_numeric(usd_values, errors='coerce')
-                valid_values = usd_values_numeric.dropna()
-                
-                if len(valid_values) > 0:
-                    avg_salary_filtered = float(valid_values.mean())
-                    st.metric("Average Salary (USD)", f"{avg_salary_filtered:,.2f}")
-                    if len(valid_values) < len(df_filtered):
-                        st.caption(f"Based on {len(valid_values)}/{len(df_filtered)} converted entries")
-                else:
-                    st.metric("Average Salary (USD)", "N/A")
-                    st.caption("No USD data available for filter")
-            else:
-                st.metric("Average Salary (USD)", "N/A")
-        with filtered_metrics[2]:
-            unique_roles_filtered = len(df_filtered['Role'].unique()) if len(df_filtered) > 0 else 0
-            st.metric("Unique Roles", unique_roles_filtered)
-
-        # Data table with horizontal scroll on mobile (all data from new_salary.csv)
-        st.markdown("""
-            <div style="margin-top: 2rem; margin-bottom: 1rem;">
-                <h2 style="color: #2d3748; font-weight: 600; border-bottom: 3px solid #667eea; padding-bottom: 0.5rem;">
-                    📋 All Data
-                </h2>
-            </div>
-        """, unsafe_allow_html=True)
-        
-        # Diagnostic info about USD conversion
-        with st.expander("🔧 Currency Conversion Status", expanded=False):
-            col1, col2, col3 = st.columns(3)
-            with col1:
-                try:
-                    currency_dist = df['Currency Code'].value_counts().to_dict() if 'Currency Code' in df.columns else {}
-                    st.metric("Currency Types", len(currency_dist))
-                    if currency_dist:
-                        st.caption(", ".join([f"{k}({v})" for k, v in sorted(currency_dist.items())[:5]]))
-                except Exception:
-                    st.metric("Currency Types", "?")
-            with col2:
-                try:
-                    usd_count = df['Monthly Salary in USD'].notna().sum() if 'Monthly Salary in USD' in df.columns else 0
-                    st.metric("Converted to USD", usd_count)
-                    st.caption(f"out of {len(df)} entries")
-                except Exception:
-                    st.metric("Converted to USD", "?")
-            with col3:
-                try:
-                    fx_source = st.session_state.get('fx_source', 'Not available')
-                    st.metric("FX Source", "✅ Live" if "forexrateapi" in fx_source else "❌ Fallback")
-                    st.caption(fx_source[:30] if fx_source else "N/A")
-                except Exception:
-                    st.metric("FX Source", "?")
-        
-        # Hint if FX-derived USD values are missing
-        try:
-            if 'Monthly Salary in USD' not in df.columns or pd.to_numeric(df.get('Monthly Salary in USD'), errors='coerce').notna().sum() == 0:
-                st.warning("⚠️ **No USD values available** - Either Currency Code mapping failed or Forex API is unavailable. Average Salary will be calculated from available USD entries only.")
-        except Exception:
-            pass
-        try:
-            st.markdown('<div class="table-container">', unsafe_allow_html=True)
-            # Build display DataFrame and ensure Currency Code is inserted before Monthly Gross Salary
-            display_df = df_filtered.copy()
-            if 'Currency Code' not in display_df.columns:
-                # Ensure column exists (may be empty if mapping failed)
-                display_df['Currency Code'] = ''
-
-            # Desired display order (will filter by availability)
-            desired_order = ['Role', 'Currency Code', 'Monthly Gross Salary', 'Monthly Salary in USD',
-                             'Years of Experience', 'Industry', 'Nationality', 'Company location (Country)',
-                             'Submission Date']
-            display_cols = [c for c in desired_order if c in display_df.columns]
-
-            if display_cols:
-                display_df = display_df[display_cols].copy()
-                
-                # Sort by Submission Date if available
-                if 'Submission Date' in display_df.columns:
-                    display_df = display_df.sort_values('Submission Date', ascending=False)
-                    # Format the date for display as dd/mm/YYYY
-                    display_df['Submission Date'] = pd.to_datetime(
-                        display_df['Submission Date'], errors='coerce', dayfirst=True
-                    ).dt.strftime('%d/%m/%Y')
-                
-                st.dataframe(
-                    display_df,
-                    use_container_width=True,
-                    hide_index=True
-                )
-            else:
-                st.warning("No displayable columns found in the data.")
-            st.markdown('</div>', unsafe_allow_html=True)
-        except Exception as e:
-            st.error(f"Error displaying data table: {str(e)}")
-            st.exception(e)
-
-        # Recommended visualizations (rendered below the table)
-        st.markdown("""
-            <div style="margin-top: 3rem; margin-bottom: 1.5rem;">
-                <h2 style="color: #2d3748; font-weight: 600; border-bottom: 3px solid #667eea; padding-bottom: 0.5rem;">
-                    📈 Visualizations
-                </h2>
-            </div>
-        """, unsafe_allow_html=True)
-        try:
-            st.markdown("""
-                <div style="margin-top: 2rem; margin-bottom: 1rem;">
-                    <h3 style="color: #4a5568; font-weight: 600; font-size: 1.3rem;">
-                        📊 Salary Distribution
-                    </h3>
-                </div>
-            """, unsafe_allow_html=True)
-            fig = create_salary_distribution(df_filtered)
-            st.plotly_chart(fig, use_container_width=True, config={'responsive': True, 'displayModeBar': True})
-        except Exception as e:
-            st.error(f"Error creating salary distribution chart: {str(e)}")
-
-        try:
-            st.markdown("""
-                <div style="margin-top: 2rem; margin-bottom: 1rem;">
-                    <h3 style="color: #4a5568; font-weight: 600; font-size: 1.3rem;">
-                        📈 Experience vs Salary
-                    </h3>
-                </div>
-            """, unsafe_allow_html=True)
-            fig = create_experience_salary_correlation(df_filtered)
-            st.plotly_chart(fig, use_container_width=True, config={'responsive': True, 'displayModeBar': True})
-        except Exception as e:
-            st.error(f"Error creating experience correlation chart: {str(e)}")
-
-        try:
-            st.markdown("""
-                <div style="margin-top: 2rem; margin-bottom: 1rem;">
-                    <h3 style="color: #4a5568; font-weight: 600; font-size: 1.3rem;">
-                        🏢 Industry Salary Spread
-                    </h3>
-                </div>
-            """, unsafe_allow_html=True)
-            fig = create_industry_salary_box(df_filtered)
-            st.plotly_chart(fig, use_container_width=True, config={'responsive': True, 'displayModeBar': True})
-        except Exception as e:
-            st.error(f"Error creating industry analysis chart: {str(e)}")
-
-        try:
-            st.markdown("""
-                <div style="margin-top: 2rem; margin-bottom: 1rem;">
-                    <h3 style="color: #4a5568; font-weight: 600; font-size: 1.3rem;">
-                        🎓 Salary by Degree
-                    </h3>
-                </div>
-            """, unsafe_allow_html=True)
-            fig = create_degree_distribution(df_filtered)
-            st.plotly_chart(fig, use_container_width=True, config={'responsive': True, 'displayModeBar': True})
-        except Exception as e:
-            st.error(f"Error creating degree distribution chart: {str(e)}")
-
-        try:
-            st.markdown("""
-                <div style="margin-top: 2rem; margin-bottom: 1rem;">
-                    <h3 style="color: #4a5568; font-weight: 600; font-size: 1.3rem;">
-                        💼 Top Roles by Salary
-                    </h3>
-                </div>
-            """, unsafe_allow_html=True)
-            fig = create_top_roles_salary(df_filtered)
-            st.plotly_chart(fig, use_container_width=True, config={'responsive': True, 'displayModeBar': True})
-        except Exception as e:
-            st.error(f"Error creating role analysis chart: {str(e)}")
+    if df.empty:
+        table_rows = '<tr><td colspan="4">No salary data yet.</td></tr>'
     else:
-        st.info("No salary data available yet. Be the first to contribute!")
+        preview = df.head(8).copy()
+        rows = []
+        for _, row in preview.iterrows():
+            role = html.escape(str(row.get("Role", "")))
+            location = html.escape(str(row.get("Company location", row.get("Company location (Country)", ""))))
+            salary = html.escape(str(row.get("Monthly Gross Salary", "")))
+            rows.append(f"<tr><td>{role}</td><td>{location}</td><td>{salary}</td></tr>")
+        table_rows = "".join(rows)
 
-    # Mobile-friendly submission form with enhanced styling
-    st.markdown("""
-        <div style="margin-top: 3rem; margin-bottom: 1rem;">
-            <h2 style="color: #2d3748; font-weight: 600; border-bottom: 3px solid #667eea; padding-bottom: 0.5rem;">
-                ✍️ Submit Your Salary Data
-            </h2>
-        </div>
-    """, unsafe_allow_html=True)
-    with st.expander("📝 Open Submission Form", expanded=False):
-        submission_form(save_submission)
+    total_entries = len(df)
+    salaries = pd.to_numeric(df.get("Monthly Gross Salary", pd.Series(dtype=float)), errors="coerce").dropna()
+    average_salary = f"{salaries.mean():,.2f}" if not salaries.empty else "n/a"
+    unique_roles = df["Role"].nunique() if "Role" in df.columns else 0
+    countries = [str(value) for value in df.get("Company location", pd.Series(dtype=str)).dropna().astype(str).tolist() if str(value).strip()] if "Company location" in df.columns else []
 
-    # Sidebar removed per request
+    return f"""<!DOCTYPE html>
+<html lang=\"en\">
+<head>
+  <meta charset=\"utf-8\" />
+  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" />
+  <title>Salary Transparency Platform</title>
+  <style>
+    body {{ font-family: Arial, sans-serif; margin: 0; padding: 2rem; background: #f5f7fb; color: #14213d; }}
+    .card {{ background: white; padding: 1.5rem; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.08); margin-bottom: 1rem; }}
+    h1, h2 {{ margin-top: 0; }}
+    form {{ display: grid; gap: 0.75rem; }}
+    label {{ font-weight: 600; }}
+    input, select {{ padding: 0.65rem; border: 1px solid #cfd8e3; border-radius: 8px; }}
+    button {{ padding: 0.7rem 1rem; border: 0; border-radius: 8px; background: #2563eb; color: white; cursor: pointer; }}
+    .stats {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; }}
+    .stat {{ background: #eef4ff; padding: 1rem; border-radius: 10px; }}
+    table {{ width: 100%; border-collapse: collapse; }}
+    th, td {{ padding: 0.7rem; border-bottom: 1px solid #e5e7eb; text-align: left; }}
+    .message {{ padding: 0.8rem; border-radius: 8px; background: #ecfdf3; color: #166534; margin-bottom: 1rem; }}
+  </style>
+</head>
+<body>
+  <div class=\"card\">
+    <h1>Salary Transparency Platform</h1>
+    <p>This local app now runs in your browser so users can submit and review salary data without using the terminal.</p>
+    {message_html}
+  </div>
+
+  <div class=\"card\">
+    <h2>Overview</h2>
+    <div class=\"stats\">
+      <div class=\"stat\"><strong>{total_entries}</strong><br />entries</div>
+      <div class=\"stat\"><strong>{average_salary}</strong><br />average monthly gross salary</div>
+      <div class=\"stat\"><strong>{unique_roles}</strong><br />unique roles</div>
+      <div class=\"stat\"><strong>{len(set(countries))}</strong><br />locations represented</div>
+    </div>
+  </div>
+
+  <div class=\"card\">
+    <h2>Submit salary data</h2>
+    <form action=\"/submit\" method=\"post\">
+      <label>Name / role</label>
+      <input name=\"Role\" placeholder=\"e.g. Software Engineer\" />
+      <label>Company location</label>
+      <input name=\"Company location\" placeholder=\"e.g. Lusaka\" />
+      <label>Monthly Gross Salary</label>
+      <input name=\"Monthly Gross Salary\" type=\"number\" step=\"0.01\" />
+      <label>Salary Gross in USD</label>
+      <input name=\"Salary Gross in USD\" type=\"number\" step=\"0.01\" />
+      <label>Years of Experience</label>
+      <input name=\"Years of Experience\" />
+      <label>Degree</label>
+      <input name=\"Degree\" />
+      <label>Approx. No. of employees in company</label>
+      <input name=\"Approx. No. of employees in company\" />
+      <label>Your Country/ Location</label>
+      <input name=\"Your Country/ Location\" />
+      <label>Nationality</label>
+      <input name=\"Nationality\" />
+      <label>Industry</label>
+      <input name=\"Industry\" />
+      <button type=\"submit\">Save entry</button>
+    </form>
+  </div>
+
+  <div class=\"card\">
+    <h2>Recent entries</h2>
+    <table>
+      <thead><tr><th>Role</th><th>Location</th><th>Monthly Gross Salary</th></tr></thead>
+      <tbody>{table_rows}</tbody>
+    </table>
+  </div>
+</body>
+</html>"""
+
+
+class SalaryRequestHandler(BaseHTTPRequestHandler):
+    def do_GET(self) -> None:  # noqa: N802
+        if self.path.startswith("/health"):
+            self.send_response(200)
+            self.send_header("Content-Type", "text/plain; charset=utf-8")
+            self.end_headers()
+            self.wfile.write(b"ok")
+            return
+
+        df = load_data()
+        message = None
+        if "?" in self.path:
+            query = urllib.parse.urlsplit(self.path).query
+            params = urllib.parse.parse_qs(query)
+            if params.get("message"):
+                message = params["message"][0]
+
+        html_body = build_dashboard_html(df, message=message).encode("utf-8")
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(html_body)))
+        self.end_headers()
+        self.wfile.write(html_body)
+
+    def do_POST(self) -> None:  # noqa: N802
+        if self.path != "/submit":
+            self.send_response(404)
+            self.end_headers()
+            self.wfile.write(b"Not found")
+            return
+
+        content_length = int(self.headers.get("Content-Length", "0"))
+        body = self.rfile.read(content_length).decode("utf-8")
+        form_data = urllib.parse.parse_qs(body, keep_blank_values=True)
+        record = {}
+        for key, values in form_data.items():
+            if values:
+                record[key] = values[0]
+
+        success, message = save_submission(record)
+        target = "/?message=" + urllib.parse.quote(message)
+        if not success:
+            target = "/?message=" + urllib.parse.quote("Submission failed: " + message)
+
+        self.send_response(303)
+        self.send_header("Location", target)
+        self.end_headers()
+
+    def log_message(self, format: str, *args) -> None:  # noqa: A003
+        return
+
+
+def run_cli() -> None:
+    from components.filters import country_filter, industry_filter
+    from components.forms import submission_form
+
+    print_banner()
+
+    if not check_db_health():
+        print("Database health check failed. The app may be unable to read or save entries.")
+
+    df = load_data()
+
+    while True:
+        print("\nMain menu")
+        print("1. View summary")
+        print("2. Show recent entries")
+        print("3. Filter and view data")
+        print("4. Submit a new salary entry")
+        print("5. Exit")
+
+        choice = input("Choose an option [1-5]: ").strip()
+
+        if choice == "1":
+            print_summary(df)
+        elif choice == "2":
+            show_entries(df)
+        elif choice == "3":
+            filtered = df.copy()
+            selected_country = country_filter(filtered)
+            if selected_country != "All":
+                country_column = next(
+                    (col for col in ["Company location (Country)", "Company location", "Your Country/ Location"] if col in filtered.columns),
+                    None,
+                )
+                if country_column:
+                    filtered = filtered[filtered[country_column].astype(str).str.strip() == selected_country]
+
+            selected_industry = industry_filter(filtered)
+            if selected_industry != "All Industries" and "Industry" in filtered.columns:
+                filtered = filtered[filtered["Industry"].fillna("").astype(str).str.strip() == selected_industry]
+
+            print(f"\nShowing {len(filtered)} entries for {selected_country} / {selected_industry}")
+            show_entries(filtered)
+        elif choice == "4":
+            saved = submission_form(save_submission)
+            if saved:
+                df = load_data()
+        elif choice == "5":
+            print("Goodbye.")
+            break
+        else:
+            print("Please enter a valid option.")
+
+
+def print_summary(df: pd.DataFrame) -> None:
+    print(f"\nLoaded {len(df)} entries")
+    if df.empty:
+        print("No salary data available yet.")
+        return
+
+    if "Monthly Gross Salary" in df.columns:
+        salaries = pd.to_numeric(df["Monthly Gross Salary"], errors="coerce").dropna()
+        if not salaries.empty:
+            print(f"Average salary: {salaries.mean():,.2f}")
+
+    if "Role" in df.columns:
+        print(f"Unique roles: {df['Role'].nunique()}")
+
+    if "Company location (Country)" in df.columns:
+        countries = [value for value in df["Company location (Country)"].dropna().astype(str).tolist() if value]
+        print(f"Countries represented: {len(set(countries))}")
+
+
+def show_entries(df: pd.DataFrame, limit: int = 20) -> None:
+    if df.empty:
+        print("No entries to display.")
+        return
+
+    display_columns = [
+        col for col in ["Role", "Company location (Country)", "Monthly Gross Salary", "Years of Experience", "Industry"]
+        if col in df.columns
+    ]
+    if not display_columns:
+        display_columns = list(df.columns[:5])
+
+    preview = df[display_columns].head(limit).copy()
+    print(preview.to_string(index=False))
+
+
+def run_browser_server(port: int = 8000) -> None:
+    print_banner()
+    if not check_db_health():
+        print("Database health check failed. The app may be unable to read or save entries.")
+
+    server = ThreadingHTTPServer(("0.0.0.0", port), SalaryRequestHandler)
+    print(f"Open http://localhost:{port} or http://127.0.0.1:{port} in your browser")
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        print("\nShutting down server...")
+    finally:
+        server.server_close()
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Salary Transparency Platform")
+    parser.add_argument("--cli", action="store_true", help="Run the terminal-based interface instead of the browser app")
+    parser.add_argument("--port", type=int, default=int(os.getenv("PORT", "8000")), help="Port for the browser app")
+    args = parser.parse_args()
+
+    if args.cli:
+        run_cli()
+    else:
+        run_browser_server(port=args.port)
+
 
 if __name__ == "__main__":
-    #os.system('taskkill /F /IM streamlit.exe')
     main()
