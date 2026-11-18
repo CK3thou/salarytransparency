@@ -4,6 +4,10 @@ The public website is a static app in `site/`, hosted on GitHub Pages and backed
 Supabase. The Python browser app in `main.py` remains available for local use and
 stores data in SQLite; it is not the GitHub Pages server.
 
+The public site includes recent and paginated all-entry views, filters for role,
+location, industry, and currency, and charts for salary, industry, experience,
+and degree distributions.
+
 ## Supabase setup
 
 1. In the Supabase SQL Editor for the project, run
