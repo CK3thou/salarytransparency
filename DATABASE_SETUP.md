@@ -1,12 +1,22 @@
-# Data Storage Notes
+# Supabase Setup
 
-This project no longer uses a database. All data is stored in a single CSV file:
+The GitHub Pages website reads and submits records through Supabase. Run the
+following migration in the Supabase SQL Editor:
 
-- Primary dataset (single source of truth): `data/new_salary.csv`
-- New submissions are appended to this file by the app.
-- The app reads from this file on startup to power charts and tables.
+```text
+supabase/migrations/20261118000000_create_salary_entries.sql
+```
 
-If `data/new_salary.csv` is missing, the app will create it with the proper header automatically.
+The migration creates `public.salary_entries`, enables row-level security, and
+allows public reads and anonymous inserts. It does not allow anonymous updates
+or deletes.
 
-Legacy database setup and migration scripts have been deprecated and removed. No further database configuration is required.
+In the GitHub repository, add the Supabase project's publishable (or legacy
+`anon`) key under **Settings → Secrets and variables → Actions** with the name
+`SUPABASE_ANON_KEY`. The project URL is configured in the Pages workflow.
+Never use a `service_role` key in client-side code.
 
+Existing SQLite or CSV data is not transferred automatically. Import rows into
+`public.salary_entries` using the Supabase dashboard's table import tool. The
+table's main required fields are `role`, `company_location`,
+`monthly_gross_salary`, and `currency`.
