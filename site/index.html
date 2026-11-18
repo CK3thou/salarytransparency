@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#102a43" />
+    <meta
+      name="description"
+      content="Explore and share salary information to make compensation more transparent."
+    />
+    <title>Salary Transparency Platform</title>
+    <link rel="stylesheet" href="./styles.css" />
+    <script src="./config.js"></script>
+    <script type="module" src="./app.js"></script>
+  </head>
+  <body>
+    <header class="site-header">
+      <a class="brand" href="./">Salary Transparency</a>
+      <a class="header-link" href="#submit">Share your salary</a>
+    </header>
+
+    <main>
+      <section class="hero">
+        <p class="eyebrow">Better information. Fairer pay.</p>
+        <h1>Make salary transparency work for everyone.</h1>
+        <p class="hero-copy">
+          Explore real compensation information and share your own to help people
+          make more informed career decisions.
+        </p>
+        <a class="button button-light" href="#submit">Add your salary</a>
+      </section>
+
+      <section class="content-grid" aria-label="Salary transparency data">
+        <section class="panel overview" aria-labelledby="overview-title">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Community data</p>
+              <h2 id="overview-title">Recent salaries</h2>
+            </div>
+            <span id="entry-count" class="entry-count">Loading…</span>
+          </div>
+          <p id="load-status" class="status" role="status" aria-live="polite">
+            Connecting to the salary database…
+          </p>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th scope="col">Role</th>
+                  <th scope="col">Location</th>
+                  <th scope="col">Monthly gross</th>
+                </tr>
+              </thead>
+              <tbody id="salary-rows">
+                <tr><td colspan="3">Loading salary data…</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="privacy-note">
+            Submissions are public and are shown without names or identifying
+            information.
+          </p>
+        </section>
+
+        <section class="panel form-panel" id="submit" aria-labelledby="submit-title">
+          <p class="eyebrow">Help close the information gap</p>
+          <h2 id="submit-title">Share your salary</h2>
+          <p class="form-intro">
+            Your entry helps build a clearer picture of compensation across roles
+            and locations.
+          </p>
+          <form id="salary-form">
+            <label>
+              Role
+              <input name="role" required maxlength="120" autocomplete="organization-title" />
+            </label>
+            <label>
+              Company location
+              <input name="company_location" required maxlength="120" placeholder="City, country" />
+            </label>
+            <label>
+              Monthly gross salary
+              <input name="monthly_gross_salary" required type="number" min="0.01" step="0.01" />
+            </label>
+            <label>
+              Salary currency
+              <select name="currency" required>
+                <option value="ZMW">ZMW</option>
+                <option value="USD">USD</option>
+              </select>
+            </label>
+            <div class="optional-fields">
+              <label>
+                Monthly gross salary in USD (optional)
+                <input name="salary_gross_in_usd" type="number" min="0" step="0.01" />
+              </label>
+              <label>
+                Years of experience (optional)
+                <input name="years_of_experience" maxlength="40" />
+              </label>
+              <label>
+                Industry (optional)
+                <input name="industry" maxlength="120" />
+              </label>
+              <label>
+                Approximate company size (optional)
+                <input name="company_size" maxlength="80" />
+              </label>
+              <label>
+                Degree (optional)
+                <input name="degree" maxlength="80" />
+              </label>
+              <label>
+                Your country/location (optional)
+                <input name="country_location" maxlength="120" />
+              </label>
+              <label>
+                Nationality (optional)
+                <input name="nationality" maxlength="120" />
+              </label>
+            </div>
+            <button id="submit-button" class="button" type="submit">Submit salary</button>
+            <p id="form-status" class="status" role="status" aria-live="polite"></p>
+          </form>
+        </section>
+      </section>
+    </main>
+
+    <footer>
+      <p>Salary information is shared by the community. Do not include personal or identifying details.</p>
+    </footer>
+  </body>
+</html>
